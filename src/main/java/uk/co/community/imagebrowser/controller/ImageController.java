@@ -109,7 +109,7 @@ public class ImageController {
                     hx-get="/image/%d/viewer"
                     hx-target="#viewer-container"
                     hx-swap="innerHTML"
-                    onclick="closeModal()">
+                    hx-on:htmx:after-request="closeModal()">
                 View Full Image ▶
             </button>
         """.formatted(
