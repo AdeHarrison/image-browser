@@ -1,0 +1,9 @@
+uk/co/community/imagebrowser/TestCacheConfig.class
+uk/co/community/imagebrowser/service/AdminSessionManagerTest.class
+uk/co/community/imagebrowser/service/ThumbnailServiceTest.class
+uk/co/community/imagebrowser/repository/ImageRepositoryTest.class
+uk/co/community/imagebrowser/service/SpreadsheetImportServiceTest.class
+uk/co/community/imagebrowser/integration/ApplicationIntegrationIT.class
+uk/co/community/imagebrowser/service/ImageSearchServiceTest.class
+uk/co/community/imagebrowser/controller/AdminControllerTest.class
+uk/co/community/imagebrowser/controller/ImageControllerTest.class
