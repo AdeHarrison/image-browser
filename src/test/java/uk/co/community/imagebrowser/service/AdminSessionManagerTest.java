@@ -23,33 +23,33 @@ class AdminSessionManagerTest {
 
     @Test
     @DisplayName("first login succeeds when no session is active")
-    void firstLoginSucceeds() {
+    void login_WhenNoSessionActive_ShouldSucceed() {
         assertThat(manager.login("session-1")).isTrue();
     }
 
     @Test
     @DisplayName("second login fails when a session is already active")
-    void secondLoginFails() {
+    void login_WhenSessionAlreadyActive_ShouldFail() {
         manager.login("session-1");
         assertThat(manager.login("session-2")).isFalse();
     }
 
     @Test
     @DisplayName("isAdminLoggedIn returns false initially")
-    void notLoggedInInitially() {
+    void isAdminLoggedIn_WhenNoLogin_ShouldReturnFalse() {
         assertThat(manager.isAdminLoggedIn()).isFalse();
     }
 
     @Test
     @DisplayName("isAdminLoggedIn returns true after login")
-    void loggedInAfterLogin() {
+    void isAdminLoggedIn_WhenLoggedIn_ShouldReturnTrue() {
         manager.login("session-1");
         assertThat(manager.isAdminLoggedIn()).isTrue();
     }
 
     @Test
     @DisplayName("isAdminLoggedIn returns false after logout")
-    void notLoggedInAfterLogout() {
+    void isAdminLoggedIn_WhenLoggedOut_ShouldReturnFalse() {
         manager.login("session-1");
         manager.logout("session-1");
         assertThat(manager.isAdminLoggedIn()).isFalse();
@@ -57,7 +57,7 @@ class AdminSessionManagerTest {
 
     @Test
     @DisplayName("logout only clears the active session — other sessions cannot log out admin")
-    void logoutIgnoresWrongSession() {
+    void logout_WhenWrongSession_ShouldNotClearActiveSession() {
         manager.login("session-1");
         manager.logout("session-99"); // different session — should have no effect
         assertThat(manager.isAdminLoggedIn()).isTrue();
@@ -65,28 +65,28 @@ class AdminSessionManagerTest {
 
     @Test
     @DisplayName("isActiveSession returns true for the logged-in session")
-    void isActiveSessionTrue() {
+    void isActiveSession_WhenSessionMatches_ShouldReturnTrue() {
         manager.login("session-1");
         assertThat(manager.isActiveSession("session-1")).isTrue();
     }
 
     @Test
     @DisplayName("isActiveSession returns false for a different session")
-    void isActiveSessionFalse() {
+    void isActiveSession_WhenSessionDiffers_ShouldReturnFalse() {
         manager.login("session-1");
         assertThat(manager.isActiveSession("session-2")).isFalse();
     }
 
     @Test
     @DisplayName("isActiveSession returns false for null")
-    void isActiveSessionNull() {
+    void isActiveSession_WhenSessionNull_ShouldReturnFalse() {
         manager.login("session-1");
         assertThat(manager.isActiveSession(null)).isFalse();
     }
 
     @Test
     @DisplayName("login can succeed again after logout")
-    void reloginAfterLogout() {
+    void login_WhenAfterLogout_ShouldSucceedAgain() {
         manager.login("session-1");
         manager.logout("session-1");
         assertThat(manager.login("session-2")).isTrue();
@@ -94,7 +94,7 @@ class AdminSessionManagerTest {
 
     @Test
     @DisplayName("forceLogout releases the lock")
-    void forceLogoutReleasesLock() {
+    void forceLogout_WhenInvoked_ShouldReleaseLock() {
         manager.login("session-1");
         manager.forceLogout("session-1");
         assertThat(manager.isAdminLoggedIn()).isFalse();
@@ -102,7 +102,7 @@ class AdminSessionManagerTest {
 
     @Test
     @DisplayName("concurrent login attempts — only one wins")
-    void concurrentLoginOnlyOneWins() throws InterruptedException {
+    void login_WhenConcurrentAttempts_ShouldOnlyAllowOneToWin() throws InterruptedException {
         int            threads     = 20;
         var            latch       = new CountDownLatch(1);
         var            successCount = new AtomicInteger(0);

@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: uk.co.community.imagebrowser.service.AdminSessionManagerTest
--------------------------------------------------------------------------------
-Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in uk.co.community.imagebrowser.service.AdminSessionManagerTest

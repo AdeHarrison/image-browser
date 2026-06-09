@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: uk.co.community.imagebrowser.controller.AdminControllerTest
--------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.230 s -- in uk.co.community.imagebrowser.controller.AdminControllerTest

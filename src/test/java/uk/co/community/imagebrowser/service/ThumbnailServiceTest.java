@@ -27,43 +27,43 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("identifies EMF as vector format")
-    void emf_isVector() {
+    void isVectorFormat_WhenEmf_ShouldReturnTrue() {
         assertThat(service.isVectorFormat("emf")).isTrue();
     }
 
     @Test
     @DisplayName("identifies WMF as vector format")
-    void wmf_isVector() {
+    void isVectorFormat_WhenWmf_ShouldReturnTrue() {
         assertThat(service.isVectorFormat("wmf")).isTrue();
     }
 
     @Test
     @DisplayName("identifies SVG as vector format")
-    void svg_isVector() {
+    void isVectorFormat_WhenSvg_ShouldReturnTrue() {
         assertThat(service.isVectorFormat("svg")).isTrue();
     }
 
     @Test
     @DisplayName("PNG is not a vector format")
-    void png_notVector() {
+    void isVectorFormat_WhenPng_ShouldReturnFalse() {
         assertThat(service.isVectorFormat("png")).isFalse();
     }
 
     @Test
     @DisplayName("JPEG is not a vector format")
-    void jpeg_notVector() {
+    void isVectorFormat_WhenJpeg_ShouldReturnFalse() {
         assertThat(service.isVectorFormat("jpeg")).isFalse();
     }
 
     @Test
     @DisplayName("null extension is not a vector format")
-    void null_notVector() {
+    void isVectorFormat_WhenNull_ShouldReturnFalse() {
         assertThat(service.isVectorFormat(null)).isFalse();
     }
 
     @Test
     @DisplayName("extension matching is case-insensitive")
-    void caseInsensitive() {
+    void isVectorFormat_WhenExtensionUppercase_ShouldMatchCaseInsensitively() {
         assertThat(service.isVectorFormat("EMF")).isTrue();
         assertThat(service.isVectorFormat("WMF")).isTrue();
     }
@@ -74,7 +74,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("scales image down so longest edge equals maxPx")
-    void scalesDownLandscape() {
+    void scale_WhenLandscapeLargerThanMax_ShouldScaleLongestEdgeToMax() {
         BufferedImage src = new BufferedImage(400, 200, BufferedImage.TYPE_INT_RGB);
         BufferedImage dst = service.scale(src, 128);
         assertThat(dst.getWidth()).isEqualTo(128);
@@ -83,7 +83,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("scales portrait image so height equals maxPx")
-    void scalesDownPortrait() {
+    void scale_WhenPortraitLargerThanMax_ShouldScaleHeightToMax() {
         BufferedImage src = new BufferedImage(100, 400, BufferedImage.TYPE_INT_RGB);
         BufferedImage dst = service.scale(src, 128);
         assertThat(dst.getHeight()).isEqualTo(128);
@@ -92,7 +92,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("does not upscale images smaller than maxPx")
-    void doesNotUpscale() {
+    void scale_WhenImageSmallerThanMax_ShouldNotUpscale() {
         BufferedImage src = new BufferedImage(64, 32, BufferedImage.TYPE_INT_RGB);
         BufferedImage dst = service.scale(src, 128);
         // No upscaling — original returned
@@ -102,7 +102,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("handles square image")
-    void squareImage() {
+    void scale_WhenSquareImage_ShouldScaleBothDimensionsToMax() {
         BufferedImage src = new BufferedImage(256, 256, BufferedImage.TYPE_INT_RGB);
         BufferedImage dst = service.scale(src, 128);
         assertThat(dst.getWidth()).isEqualTo(128);
@@ -115,7 +115,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("creates non-empty thumbnail bytes from valid PNG")
-    void createsThumbnailFromPng() throws IOException {
+    void createThumbnail_WhenValidPng_ShouldReturnNonEmptyBytes() throws IOException {
         byte[] pngBytes = createTestPng(300, 200);
         byte[] thumb    = service.createThumbnail(pngBytes);
         assertThat(thumb).isNotEmpty();
@@ -123,7 +123,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("returns empty array for invalid/undecodable bytes")
-    void returnsEmptyForInvalidBytes() throws IOException {
+    void createThumbnail_WhenBytesInvalid_ShouldReturnEmptyArray() throws IOException {
         byte[] garbage = new byte[]{0x00, 0x01, 0x02, 0x03};
         byte[] thumb   = service.createThumbnail(garbage);
         assertThat(thumb).isEmpty();
@@ -131,7 +131,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("returns empty array for empty input")
-    void returnsEmptyForEmptyInput() throws IOException {
+    void createThumbnail_WhenInputEmpty_ShouldReturnEmptyArray() throws IOException {
         byte[] thumb = service.createThumbnail(new byte[0]);
         assertThat(thumb).isEmpty();
     }
@@ -142,7 +142,7 @@ class ThumbnailServiceTest {
 
     @Test
     @DisplayName("encodes BufferedImage as JPEG bytes")
-    void encodesAsJpeg() throws IOException {
+    void encodeAsJpeg_WhenGivenImage_ShouldReturnJpegBytes() throws IOException {
         BufferedImage img  = new BufferedImage(64, 64, BufferedImage.TYPE_INT_RGB);
         byte[]        jpeg = service.encodeAsJpeg(img, 0.75f);
         assertThat(jpeg).isNotEmpty();

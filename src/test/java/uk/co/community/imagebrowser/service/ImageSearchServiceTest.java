@@ -31,7 +31,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("search delegates to repository with correct offset")
-    void searchDelegatesToRepository() {
+    void search_WhenInvoked_ShouldDelegateToRepositoryWithCorrectOffset() {
         var expected = List.of(summary(1L, "canal.jpg"));
         when(repository.search("canal", 0, 30)).thenReturn(expected);
 
@@ -43,7 +43,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("search with page 2 passes correct offset")
-    void searchPageTwoOffset() {
+    void search_WhenPageTwo_ShouldPassCorrectOffset() {
         when(repository.search("boat", 30, 30)).thenReturn(List.of());
 
         service.search("boat", 1);
@@ -53,7 +53,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("findById delegates to repository")
-    void findByIdDelegates() {
+    void findById_WhenInvoked_ShouldDelegateToRepository() {
         var s = summary(42L, "image.jpg");
         when(repository.findSummaryById(42L)).thenReturn(Optional.of(s));
 
@@ -64,7 +64,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("findById returns empty when not found")
-    void findByIdEmpty() {
+    void findById_WhenNotFound_ShouldReturnEmpty() {
         when(repository.findSummaryById(99L)).thenReturn(Optional.empty());
 
         assertThat(service.findById(99L)).isEmpty();
@@ -72,7 +72,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("getNavigationContext builds correct context")
-    void navigationContext() {
+    void getNavigationContext_WhenMiddleImage_ShouldBuildCorrectContext() {
         when(repository.findFirstId()).thenReturn(Optional.of(1L));
         when(repository.findPrevId(5L)).thenReturn(Optional.of(4L));
         when(repository.findNextId(5L)).thenReturn(Optional.of(6L));
@@ -93,7 +93,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("NavigationContext correctly identifies first image")
-    void navigationContextFirst() {
+    void getNavigationContext_WhenFirstImage_ShouldIdentifyAsFirst() {
         when(repository.findFirstId()).thenReturn(Optional.of(1L));
         when(repository.findPrevId(1L)).thenReturn(Optional.empty());
         when(repository.findNextId(1L)).thenReturn(Optional.of(2L));
@@ -107,7 +107,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("NavigationContext correctly identifies last image")
-    void navigationContextLast() {
+    void getNavigationContext_WhenLastImage_ShouldIdentifyAsLast() {
         when(repository.findFirstId()).thenReturn(Optional.of(1L));
         when(repository.findPrevId(10L)).thenReturn(Optional.of(9L));
         when(repository.findNextId(10L)).thenReturn(Optional.empty());
@@ -121,7 +121,7 @@ class ImageSearchServiceTest {
 
     @Test
     @DisplayName("count delegates to repository")
-    void countDelegates() {
+    void count_WhenInvoked_ShouldDelegateToRepository() {
         when(repository.count()).thenReturn(42L);
         assertThat(service.count()).isEqualTo(42L);
     }

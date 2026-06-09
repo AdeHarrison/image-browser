@@ -39,7 +39,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET / returns 200 with index view")
-    void indexReturns200() throws Exception {
+    void index_WhenRequested_ShouldReturn200WithIndexView() throws Exception {
         mvc.perform(get("/"))
            .andExpect(status().isOk())
            .andExpect(view().name("index"))
@@ -48,7 +48,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /search returns grid HTML fragment")
-    void searchReturnsFragment() throws Exception {
+    void search_WhenQueryMatches_ShouldReturnGridFragment() throws Exception {
         var results = List.of(
                 new ImageSummary(1L, "canal.jpg", "Sheet1", "R0C0", 300, 200, "", ""));
         when(searchService.search("canal", 0)).thenReturn(results);
@@ -60,7 +60,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /search with empty query returns all images")
-    void searchEmptyQuery() throws Exception {
+    void search_WhenQueryEmpty_ShouldReturnAllImages() throws Exception {
         when(searchService.search("", 0)).thenReturn(List.of());
 
         mvc.perform(get("/search").param("q", ""))
@@ -70,7 +70,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /search escapes HTML in filename to prevent XSS")
-    void searchEscapesHtml() throws Exception {
+    void search_WhenFilenameContainsHtml_ShouldEscapeToPreventXss() throws Exception {
         var results = List.of(
                 new ImageSummary(1L, "<script>alert('xss')</script>",
                         "Sheet1", "R0C0", 300, 200, "", ""));
@@ -84,7 +84,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /image/{id}/modal returns modal HTML for known id")
-    void modalReturnsContent() throws Exception {
+    void modal_WhenIdKnown_ShouldReturnModalHtml() throws Exception {
         var summary = new ImageSummary(5L, "test.jpg", "Sheet1", "R1C1",
                 200, 150, "tag1", "A test image");
         when(searchService.findById(5L)).thenReturn(Optional.of(summary));
@@ -98,7 +98,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /image/{id}/modal returns not found message for unknown id")
-    void modalNotFound() throws Exception {
+    void modal_WhenIdUnknown_ShouldReturnNotFoundMessage() throws Exception {
         when(searchService.findById(999L)).thenReturn(Optional.empty());
 
         mvc.perform(get("/image/999/modal"))
@@ -108,7 +108,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /thumbnail/{id} returns 200 with image bytes")
-    void thumbnailReturns200() throws Exception {
+    void thumbnail_WhenIdKnown_ShouldReturn200WithImageBytes() throws Exception {
         when(cacheService.getThumbnail(1L)).thenReturn(Optional.of(new byte[]{1, 2, 3}));
 
         mvc.perform(get("/thumbnail/1"))
@@ -119,7 +119,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /thumbnail/{id} returns 404 when not found")
-    void thumbnailNotFound() throws Exception {
+    void thumbnail_WhenIdUnknown_ShouldReturn404() throws Exception {
         when(cacheService.getThumbnail(99L)).thenReturn(Optional.empty());
 
         mvc.perform(get("/thumbnail/99"))
@@ -128,7 +128,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /image/{id}/bytes returns 200 with image bytes")
-    void fullImageReturns200() throws Exception {
+    void fullImage_WhenIdKnown_ShouldReturn200WithImageBytes() throws Exception {
         when(cacheService.getFullImage(1L)).thenReturn(Optional.of(new byte[]{1, 2, 3}));
 
         mvc.perform(get("/image/1/bytes"))
@@ -138,7 +138,7 @@ class ImageControllerTest {
 
     @Test
     @DisplayName("GET /image/{id}/bytes returns 404 when not found")
-    void fullImageNotFound() throws Exception {
+    void fullImage_WhenIdUnknown_ShouldReturn404() throws Exception {
         when(cacheService.getFullImage(99L)).thenReturn(Optional.empty());
 
         mvc.perform(get("/image/99/bytes"))

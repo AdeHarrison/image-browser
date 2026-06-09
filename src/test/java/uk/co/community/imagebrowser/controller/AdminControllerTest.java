@@ -31,7 +31,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("GET /admin/login returns login page")
-    void loginPageReturns200() throws Exception {
+    void loginPage_WhenRequested_ShouldReturn200WithLoginView() throws Exception {
         mvc.perform(get("/admin/login"))
            .andExpect(status().isOk())
            .andExpect(view().name("admin/login"));
@@ -39,7 +39,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("POST /admin/login with wrong password returns error fragment")
-    void loginWrongPassword() throws Exception {
+    void login_WhenPasswordIncorrect_ShouldReturnErrorFragment() throws Exception {
         when(passwordService.verify("wrong")).thenReturn(false);
 
         mvc.perform(post("/admin/login").param("password", "wrong"))
@@ -49,7 +49,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("POST /admin/login when admin already logged in returns error fragment")
-    void loginAlreadyActive() throws Exception {
+    void login_WhenAdminAlreadyLoggedIn_ShouldReturnErrorFragment() throws Exception {
         when(passwordService.verify("correct")).thenReturn(true);
         when(sessionManager.isAdminLoggedIn()).thenReturn(true);
 
@@ -60,7 +60,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("POST /admin/login with correct password and free slot succeeds")
-    void loginSuccess() throws Exception {
+    void login_WhenPasswordCorrectAndSlotFree_ShouldRedirectToAdmin() throws Exception {
         when(passwordService.verify("correct")).thenReturn(true);
         when(sessionManager.isAdminLoggedIn()).thenReturn(false);
         when(sessionManager.login(any())).thenReturn(true);
@@ -72,7 +72,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("GET /admin without session redirects to login")
-    void adminPanelNoSession() throws Exception {
+    void adminPanel_WhenNoSession_ShouldRedirectToLogin() throws Exception {
         mvc.perform(get("/admin"))
            .andExpect(status().is3xxRedirection())
            .andExpect(redirectedUrl("/admin/login"));
@@ -80,7 +80,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("POST /admin/reload without session returns error")
-    void reloadNoSession() throws Exception {
+    void reload_WhenNoSession_ShouldReturnNotAuthorised() throws Exception {
         mvc.perform(post("/admin/reload"))
            .andExpect(status().isOk())
            .andExpect(content().string(containsString("Not authorised")));
@@ -88,7 +88,7 @@ class AdminControllerTest {
 
     @Test
     @DisplayName("POST /admin/logout invalidates session and redirects to /")
-    void logout() throws Exception {
+    void logout_WhenInvoked_ShouldInvalidateSessionAndRedirectToRoot() throws Exception {
         mvc.perform(post("/admin/logout"))
            .andExpect(status().is3xxRedirection())
            .andExpect(redirectedUrl("/"));

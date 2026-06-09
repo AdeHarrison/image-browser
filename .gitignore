@@ -1,0 +1,60 @@
+# Maven build output
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Compiled class files / archives
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# Logs
+*.log
+logs/
+
+# SQLite databases and write-ahead/shared-memory files (generated at runtime)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+identifier.sqlite
+:memory:?cache=shared
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+
+# Claude Code
+.claude/

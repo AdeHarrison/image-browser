@@ -29,20 +29,20 @@ class ApplicationIntegrationIT {
 
     @Test
     @DisplayName("application context loads successfully")
-    void contextLoads() {
+    void Application_SpringContext_WhenStarted_ShouldLoadSuccessfully() {
         // If the context fails to load, this test fails
     }
 
     @Test
     @DisplayName("GET / returns 200 OK")
-    void indexReturns200() throws Exception {
+    void IndexController_View_WhenRootRequested_ShouldReturn200() throws Exception {
         mvc.perform(get("/"))
            .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("GET /search with no query returns grid fragment")
-    void searchReturnsGrid() throws Exception {
+    void SearchController_Repository_WhenNoQuery_ShouldReturnGridFragment() throws Exception {
         insertTestImage("canal-boat.jpg", "canal", "narrow boat on canal");
         insertTestImage("windmill.jpg", "windmill", "old windmill in field");
 
@@ -55,7 +55,7 @@ class ApplicationIntegrationIT {
 
     @Test
     @DisplayName("GET /search with query filters results")
-    void searchFiltersResults() throws Exception {
+    void SearchController_Repository_WhenQueryGiven_ShouldFilterResults() throws Exception {
         insertTestImage("canal-boat.jpg", "canal", "narrow boat");
         insertTestImage("windmill.jpg", "windmill", "windmill");
 
@@ -67,14 +67,14 @@ class ApplicationIntegrationIT {
 
     @Test
     @DisplayName("GET /thumbnail/{id} returns 404 for unknown id")
-    void thumbnailNotFound() throws Exception {
+    void ThumbnailController_Repository_WhenIdUnknown_ShouldReturn404() throws Exception {
         mvc.perform(get("/thumbnail/99999"))
            .andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("GET /thumbnail/{id} returns 200 for known id")
-    void thumbnailFound() throws Exception {
+    void ThumbnailController_Repository_WhenIdKnown_ShouldReturn200() throws Exception {
         long id = insertTestImage("test.jpg", "test", "a test image");
 
         mvc.perform(get("/thumbnail/" + id))
@@ -84,7 +84,7 @@ class ApplicationIntegrationIT {
 
     @Test
     @DisplayName("GET /image/{id}/modal returns metadata")
-    void modalReturnsMetadata() throws Exception {
+    void ModalController_Repository_WhenIdKnown_ShouldReturnMetadata() throws Exception {
         long id = insertTestImage("heritage.jpg", "heritage", "heritage site photo");
 
         mvc.perform(get("/image/" + id + "/modal"))
@@ -94,7 +94,7 @@ class ApplicationIntegrationIT {
 
     @Test
     @DisplayName("GET /admin/login returns login page")
-    void adminLoginPage() throws Exception {
+    void AdminController_LoginView_WhenLoginRequested_ShouldReturnLoginPage() throws Exception {
         mvc.perform(get("/admin/login"))
            .andExpect(status().isOk())
            .andExpect(view().name("admin/login"));

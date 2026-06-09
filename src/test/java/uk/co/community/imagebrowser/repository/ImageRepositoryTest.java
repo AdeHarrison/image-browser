@@ -42,14 +42,14 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("insert returns a positive generated id")
-    void insertReturnsId() {
+    void insert_WhenRecordInserted_ShouldReturnPositiveGeneratedId() {
         long id = repository.insert(testRecord("test.jpg"));
         assertThat(id).isGreaterThan(0);
     }
 
     @Test
     @DisplayName("findSummaryById returns inserted record")
-    void findSummaryById() {
+    void findSummaryById_WhenIdExists_ShouldReturnRecord() {
         long id = repository.insert(testRecord("canal.jpg"));
 
         var result = repository.findSummaryById(id);
@@ -61,13 +61,13 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findSummaryById returns empty for unknown id")
-    void findSummaryByIdNotFound() {
+    void findSummaryById_WhenIdUnknown_ShouldReturnEmpty() {
         assertThat(repository.findSummaryById(999L)).isEmpty();
     }
 
     @Test
     @DisplayName("findThumbnailById returns thumbnail bytes")
-    void findThumbnailById() {
+    void findThumbnailById_WhenIdExists_ShouldReturnThumbnailBytes() {
         long id = repository.insert(testRecord("thumb.jpg"));
         var thumb = repository.findThumbnailById(id);
         assertThat(thumb).isPresent();
@@ -76,7 +76,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findFullImageById returns full image bytes")
-    void findFullImageById() {
+    void findFullImageById_WhenIdExists_ShouldReturnFullImageBytes() {
         long id = repository.insert(testRecord("full.jpg"));
         var full = repository.findFullImageById(id);
         assertThat(full).isPresent();
@@ -89,7 +89,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findAll returns all inserted records")
-    void findAll() {
+    void findAll_WhenRecordsExist_ShouldReturnAllRecords() {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
         repository.insert(testRecord("c.jpg"));
@@ -101,7 +101,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findAll respects limit and offset")
-    void findAllPaginated() {
+    void findAll_WhenLimitAndOffsetGiven_ShouldRespectPagination() {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
         repository.insert(testRecord("c.jpg"));
@@ -115,7 +115,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("search by filename prefix returns matching records")
-    void searchByFilename() {
+    void search_WhenFilenamePrefixMatches_ShouldReturnMatchingRecords() {
         repository.insert(testRecordWithMeta("canal-boat.jpg", "canal boat", "narrow boat"));
         repository.insert(testRecordWithMeta("river.jpg", "river", "river scene"));
 
@@ -127,7 +127,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("search returns empty list for no matches")
-    void searchNoMatches() {
+    void search_WhenNoMatches_ShouldReturnEmptyList() {
         repository.insert(testRecord("canal.jpg"));
 
         List<ImageSummary> results = repository.search("zzznonexistent", 0, 10);
@@ -137,7 +137,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("empty search returns all records")
-    void searchEmpty() {
+    void search_WhenQueryEmpty_ShouldReturnAllRecords() {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
 
@@ -152,7 +152,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findFirstId returns smallest id")
-    void findFirstId() {
+    void findFirstId_WhenRecordsExist_ShouldReturnSmallestId() {
         long id1 = repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
 
@@ -161,7 +161,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findLastId returns largest id")
-    void findLastId() {
+    void findLastId_WhenRecordsExist_ShouldReturnLargestId() {
         repository.insert(testRecord("a.jpg"));
         long id2 = repository.insert(testRecord("b.jpg"));
 
@@ -170,7 +170,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findNextId returns the next id in sequence")
-    void findNextId() {
+    void findNextId_WhenNotLast_ShouldReturnNextIdInSequence() {
         long id1 = repository.insert(testRecord("a.jpg"));
         long id2 = repository.insert(testRecord("b.jpg"));
 
@@ -179,7 +179,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findPrevId returns the previous id in sequence")
-    void findPrevId() {
+    void findPrevId_WhenNotFirst_ShouldReturnPreviousIdInSequence() {
         long id1 = repository.insert(testRecord("a.jpg"));
         long id2 = repository.insert(testRecord("b.jpg"));
 
@@ -188,7 +188,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findNextId returns empty for last record")
-    void findNextIdEmpty() {
+    void findNextId_WhenLastRecord_ShouldReturnEmpty() {
         repository.insert(testRecord("a.jpg"));
         long id2 = repository.insert(testRecord("b.jpg"));
 
@@ -197,7 +197,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("findFirstId and findLastId return empty on empty DB")
-    void navigationEmptyDb() {
+    void findFirstIdAndFindLastId_WhenDbEmpty_ShouldReturnEmpty() {
         assertThat(repository.findFirstId()).isEmpty();
         assertThat(repository.findLastId()).isEmpty();
     }
@@ -208,13 +208,13 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("count returns 0 for empty database")
-    void countEmpty() {
+    void count_WhenDbEmpty_ShouldReturnZero() {
         assertThat(repository.count()).isZero();
     }
 
     @Test
     @DisplayName("count returns correct number after inserts")
-    void countAfterInserts() {
+    void count_WhenRecordsInserted_ShouldReturnCorrectNumber() {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
         assertThat(repository.count()).isEqualTo(2);
@@ -226,7 +226,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("setConfig and getConfig round-trip")
-    void configRoundTrip() {
+    void setConfigAndGetConfig_WhenValueStored_ShouldRoundTrip() {
         repository.setConfig("last_updated", "2026-05-22T10:00:00");
         assertThat(repository.getConfig("last_updated"))
                 .contains("2026-05-22T10:00:00");
@@ -234,7 +234,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("setConfig is idempotent (upsert)")
-    void configUpsert() {
+    void setConfig_WhenKeyExists_ShouldUpsertValue() {
         repository.setConfig("key", "v1");
         repository.setConfig("key", "v2");
         assertThat(repository.getConfig("key")).contains("v2");
@@ -242,7 +242,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("getConfig returns empty for unknown key")
-    void configMissing() {
+    void getConfig_WhenKeyUnknown_ShouldReturnEmpty() {
         assertThat(repository.getConfig("nonexistent")).isEmpty();
     }
 
@@ -252,7 +252,7 @@ class ImageRepositoryTest {
 
     @Test
     @DisplayName("clearAll removes all images and config")
-    void clearAll() {
+    void clearAll_WhenInvoked_ShouldRemoveAllImagesAndConfig() {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
         repository.setConfig("last_updated", "2026-05-01");
