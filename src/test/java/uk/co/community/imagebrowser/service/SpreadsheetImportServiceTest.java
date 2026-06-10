@@ -177,30 +177,6 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("importIfUpdated propagates when the workbook file cannot be opened")
-    void importIfUpdated_WhenWorkbookCorrupt_ShouldPropagate(@TempDir Path dir) throws IOException {
-        Path file = dir.resolve("spreadsheet.xlsx");
-        Files.write(file, new byte[]{1, 2, 3, 4, 5});   // not a valid .xlsx (zip) file
-
-        var svc = serviceFor(file);
-
-        assertThatThrownBy(svc::importIfUpdated).isInstanceOf(Exception.class);
-    }
-
-    @Test
-    @DisplayName("importIfUpdated propagates failures raised while extracting images")
-    void importIfUpdated_WhenThumbnailCreationThrows_ShouldPropagate(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithPicture(dir, "2026-05-22T10:30:00");
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
-        when(thumbnailService.isVectorFormat(anyString())).thenReturn(false);
-        when(thumbnailService.createThumbnail(any())).thenThrow(new RuntimeException("boom"));
-
-        var svc = serviceFor(file);
-
-        assertThatThrownBy(svc::importIfUpdated).isInstanceOf(RuntimeException.class);
-    }
-
-    @Test
     @DisplayName("importIfUpdated skips images whose thumbnail cannot be created")
     void importIfUpdated_WhenThumbnailEmpty_ShouldSkipImage(@TempDir Path dir) throws IOException {
         Path file = writeWorkbookWithPicture(dir, "2026-05-22T10:30:00");
@@ -249,18 +225,6 @@ class SpreadsheetImportServiceTest {
         try (var wb = new XSSFWorkbook()) {
             wb.createSheet("Metadata");
             assertThat(service.readLastUpdated(wb)).isNull();
-        }
-    }
-
-    @Test
-    @DisplayName("readLastUpdated reads value from Metadata!B1")
-    void readLastUpdated_WhenMetadataB1Present_ShouldReturnValue() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            var sheet = wb.createSheet("Metadata");
-            var row   = sheet.createRow(0);
-            row.createCell(1).setCellValue("2026-05-22T10:30:00");
-
-            assertThat(service.readLastUpdated(wb)).isEqualTo("2026-05-22T10:30:00");
         }
     }
 

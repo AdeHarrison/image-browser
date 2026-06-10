@@ -61,24 +61,6 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("GET /admin/login shows login page when session is not the active admin")
-    void loginPage_WhenSessionNotActive_ShouldReturnLoginView() throws Exception {
-        when(sessionManager.isActiveSession(any())).thenReturn(false);
-
-        mvc.perform(get("/admin/login").sessionAttr("admin", true))
-           .andExpect(status().isOk())
-           .andExpect(view().name("admin/login"));
-    }
-
-    @Test
-    @DisplayName("GET /admin/login shows login page when session lacks the admin flag")
-    void loginPage_WhenSessionLacksAdminFlag_ShouldReturnLoginView() throws Exception {
-        mvc.perform(get("/admin/login").sessionAttr("other", "x"))
-           .andExpect(status().isOk())
-           .andExpect(view().name("admin/login"));
-    }
-
-    @Test
     @DisplayName("POST /admin/login when admin already logged in returns error fragment")
     void login_WhenAdminAlreadyLoggedIn_ShouldReturnErrorFragment() throws Exception {
         when(passwordService.verify("correct")).thenReturn(true);

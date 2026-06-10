@@ -52,16 +52,6 @@ class ImageSearchServiceTest {
     }
 
     @Test
-    @DisplayName("single-arg search delegates to page 0")
-    void search_WhenSingleArg_ShouldDelegateToPageZero() {
-        when(repository.search("foo", 0, 30)).thenReturn(List.of());
-
-        service.search("foo");
-
-        verify(repository).search("foo", 0, 30);
-    }
-
-    @Test
     @DisplayName("findById delegates to repository")
     void findById_WhenInvoked_ShouldDelegateToRepository() {
         var s = summary(42L, "image.jpg");

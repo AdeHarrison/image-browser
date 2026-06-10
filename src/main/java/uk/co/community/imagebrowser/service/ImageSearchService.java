@@ -31,10 +31,6 @@ public class ImageSearchService {
         return repository.search(query, offset, pageSize);
     }
 
-    public List<ImageSummary> search(String query) {
-        return search(query, 0);
-    }
-
     public Optional<ImageSummary> findById(long id) {
         return repository.findSummaryById(id);
     }

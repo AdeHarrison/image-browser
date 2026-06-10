@@ -37,10 +37,7 @@ public class AdminController {
     @GetMapping("/login")
     public String loginPage(HttpServletRequest request, Model model) {
         // Already logged in — redirect to admin panel
-        HttpSession session  = request.getSession(false);
-        if (session != null
-                && Boolean.TRUE.equals(session.getAttribute(ADMIN_ATTR))
-                && sessionManager.isActiveSession(session.getId())) {
+        if (isAdmin(request)) {
             return "redirect:/admin";
         }
         return "admin/login";
