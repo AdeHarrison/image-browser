@@ -9,6 +9,7 @@ import uk.co.community.imagebrowser.model.ImageSummary;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("ImageRepository")
 class ImageRepositoryTest {
@@ -83,6 +84,25 @@ class ImageRepositoryTest {
         assertThat(full.get()).isEqualTo(new byte[]{4, 5, 6, 7});
     }
 
+    @Test
+    @DisplayName("findFullImageById returns empty for unknown id")
+    void findFullImageById_WhenIdUnknown_ShouldReturnEmpty() {
+        assertThat(repository.findFullImageById(9999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("insert stores empty strings when tags and description are null")
+    void insert_WhenTagsAndDescriptionNull_ShouldStoreEmptyStrings() {
+        long id = repository.insert(new ImageRecord(
+                0L, "n.jpg", "Sheet1", "R0C0", "image/jpeg",
+                new byte[]{1}, new byte[]{1}, 10, 10, null, null));
+
+        var summary = repository.findSummaryById(id);
+        assertThat(summary).isPresent();
+        assertThat(summary.get().tags()).isEmpty();
+        assertThat(summary.get().description()).isEmpty();
+    }
+
     // ---------------------------------------------------------------
     // Search
     // ---------------------------------------------------------------
@@ -146,6 +166,17 @@ class ImageRepositoryTest {
         assertThat(results).hasSize(2);
     }
 
+    @Test
+    @DisplayName("null search query returns all records")
+    void search_WhenQueryNull_ShouldReturnAllRecords() {
+        repository.insert(testRecord("a.jpg"));
+        repository.insert(testRecord("b.jpg"));
+
+        List<ImageSummary> results = repository.search(null, 0, 100);
+
+        assertThat(results).hasSize(2);
+    }
+
     // ---------------------------------------------------------------
     // Navigation
     // ---------------------------------------------------------------
@@ -202,6 +233,15 @@ class ImageRepositoryTest {
         assertThat(repository.findLastId()).isEmpty();
     }
 
+    @Test
+    @DisplayName("findAllIds returns ids in insertion order")
+    void findAllIds_WhenRecordsExist_ShouldReturnIdsInOrder() {
+        long id1 = repository.insert(testRecord("a.jpg"));
+        long id2 = repository.insert(testRecord("b.jpg"));
+
+        assertThat(repository.findAllIds()).containsExactly(id1, id2);
+    }
+
     // ---------------------------------------------------------------
     // Count
     // ---------------------------------------------------------------
@@ -218,6 +258,15 @@ class ImageRepositoryTest {
         repository.insert(testRecord("a.jpg"));
         repository.insert(testRecord("b.jpg"));
         assertThat(repository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("count returns 0 when the COUNT query yields null")
+    void count_WhenQueryReturnsNull_ShouldReturnZero() {
+        var jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject("SELECT COUNT(*) FROM images", Long.class)).thenReturn(null);
+
+        assertThat(new ImageRepository(jdbc).count()).isZero();
     }
 
     // ---------------------------------------------------------------

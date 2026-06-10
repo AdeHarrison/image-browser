@@ -52,6 +52,16 @@ class ImageSearchServiceTest {
     }
 
     @Test
+    @DisplayName("single-arg search delegates to page 0")
+    void search_WhenSingleArg_ShouldDelegateToPageZero() {
+        when(repository.search("foo", 0, 30)).thenReturn(List.of());
+
+        service.search("foo");
+
+        verify(repository).search("foo", 0, 30);
+    }
+
+    @Test
     @DisplayName("findById delegates to repository")
     void findById_WhenInvoked_ShouldDelegateToRepository() {
         var s = summary(42L, "image.jpg");
@@ -116,6 +126,24 @@ class ImageSearchServiceTest {
         var ctx = service.getNavigationContext(10L);
 
         assertThat(ctx.isLast()).isTrue();
+        assertThat(ctx.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("NavigationContext is neither first nor last when the database is empty")
+    void getNavigationContext_WhenNoImages_ShouldBeNeitherFirstNorLast() {
+        when(repository.findFirstId()).thenReturn(Optional.empty());
+        when(repository.findPrevId(5L)).thenReturn(Optional.empty());
+        when(repository.findNextId(5L)).thenReturn(Optional.empty());
+        when(repository.findLastId()).thenReturn(Optional.empty());
+
+        var ctx = service.getNavigationContext(5L);
+
+        assertThat(ctx.firstId()).isNull();
+        assertThat(ctx.lastId()).isNull();
+        assertThat(ctx.isFirst()).isFalse();
+        assertThat(ctx.isLast()).isFalse();
+        assertThat(ctx.hasPrev()).isFalse();
         assertThat(ctx.hasNext()).isFalse();
     }
 

@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("ThumbnailService")
 class ThumbnailServiceTest {
@@ -107,6 +108,26 @@ class ThumbnailServiceTest {
         BufferedImage dst = service.scale(src, 128);
         assertThat(dst.getWidth()).isEqualTo(128);
         assertThat(dst.getHeight()).isEqualTo(128);
+    }
+
+    @Test
+    @DisplayName("returns source unchanged when width is zero")
+    void scale_WhenWidthZero_ShouldReturnSource() {
+        BufferedImage src = mock(BufferedImage.class);
+        when(src.getWidth()).thenReturn(0);
+        when(src.getHeight()).thenReturn(100);
+
+        assertThat(service.scale(src, 128)).isSameAs(src);
+    }
+
+    @Test
+    @DisplayName("returns source unchanged when height is zero")
+    void scale_WhenHeightZero_ShouldReturnSource() {
+        BufferedImage src = mock(BufferedImage.class);
+        when(src.getWidth()).thenReturn(100);
+        when(src.getHeight()).thenReturn(0);
+
+        assertThat(service.scale(src, 128)).isSameAs(src);
     }
 
     // ---------------------------------------------------------------

@@ -12,7 +12,10 @@ import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
 import uk.co.community.imagebrowser.service.SpreadsheetImportService;
 
+import java.io.IOException;
+
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -48,6 +51,34 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /admin/login redirects to panel when already authenticated")
+    void loginPage_WhenAlreadyAuthenticated_ShouldRedirectToAdmin() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+
+        mvc.perform(get("/admin/login").sessionAttr("admin", true))
+           .andExpect(status().is3xxRedirection())
+           .andExpect(redirectedUrl("/admin"));
+    }
+
+    @Test
+    @DisplayName("GET /admin/login shows login page when session is not the active admin")
+    void loginPage_WhenSessionNotActive_ShouldReturnLoginView() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(false);
+
+        mvc.perform(get("/admin/login").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(view().name("admin/login"));
+    }
+
+    @Test
+    @DisplayName("GET /admin/login shows login page when session lacks the admin flag")
+    void loginPage_WhenSessionLacksAdminFlag_ShouldReturnLoginView() throws Exception {
+        mvc.perform(get("/admin/login").sessionAttr("other", "x"))
+           .andExpect(status().isOk())
+           .andExpect(view().name("admin/login"));
+    }
+
+    @Test
     @DisplayName("POST /admin/login when admin already logged in returns error fragment")
     void login_WhenAdminAlreadyLoggedIn_ShouldReturnErrorFragment() throws Exception {
         when(passwordService.verify("correct")).thenReturn(true);
@@ -71,11 +102,33 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("POST /admin/login when the session cannot be claimed returns error")
+    void login_WhenSlotCannotBeClaimed_ShouldReturnError() throws Exception {
+        when(passwordService.verify("correct")).thenReturn(true);
+        when(sessionManager.isAdminLoggedIn()).thenReturn(false);
+        when(sessionManager.login(any())).thenReturn(false);
+
+        mvc.perform(post("/admin/login").param("password", "correct"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("could not be claimed")));
+    }
+
+    @Test
     @DisplayName("GET /admin without session redirects to login")
     void adminPanel_WhenNoSession_ShouldRedirectToLogin() throws Exception {
         mvc.perform(get("/admin"))
            .andExpect(status().is3xxRedirection())
            .andExpect(redirectedUrl("/admin/login"));
+    }
+
+    @Test
+    @DisplayName("GET /admin with a valid admin session returns the panel view")
+    void adminPanel_WhenAuthorised_ShouldReturnPanelView() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+
+        mvc.perform(get("/admin").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(view().name("admin/panel"));
     }
 
     @Test
@@ -87,10 +140,63 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/logout invalidates session and redirects to /")
-    void logout_WhenInvoked_ShouldInvalidateSessionAndRedirectToRoot() throws Exception {
+    @DisplayName("POST /admin/reload denies when the session lacks the admin flag")
+    void reload_WhenSessionLacksAdminFlag_ShouldReturnNotAuthorised() throws Exception {
+        mvc.perform(post("/admin/reload").sessionAttr("other", "x"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Not authorised")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/reload denies when the session is not the active admin")
+    void reload_WhenSessionNotActive_ShouldReturnNotAuthorised() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(false);
+
+        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Not authorised")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/reload when authorised triggers a force import and reports success")
+    void reload_WhenAuthorised_ShouldForceImportAndReturnSuccess() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(importService.forceImport()).thenReturn(
+                new SpreadsheetImportService.ImportResult(
+                        SpreadsheetImportService.ImportResult.Status.SUCCESS, 7, "v2",
+                        "7 images imported successfully."));
+
+        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("7 images imported")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/reload returns an error fragment when the import throws")
+    void reload_WhenImportThrows_ShouldReturnErrorFragment() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(importService.forceImport()).thenThrow(new IOException("disk gone"));
+
+        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Reload failed")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout without session redirects to /")
+    void logout_WhenNoSession_ShouldRedirectToRoot() throws Exception {
         mvc.perform(post("/admin/logout"))
            .andExpect(status().is3xxRedirection())
            .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    @DisplayName("POST /admin/logout with a session releases the admin lock and redirects to /")
+    void logout_WhenSessionPresent_ShouldReleaseLockAndRedirect() throws Exception {
+        mvc.perform(post("/admin/logout").sessionAttr("admin", true))
+           .andExpect(status().is3xxRedirection())
+           .andExpect(redirectedUrl("/"));
+
+        verify(sessionManager).logout(any());
     }
 }

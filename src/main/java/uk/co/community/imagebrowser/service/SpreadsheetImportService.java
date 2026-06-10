@@ -12,6 +12,7 @@ import uk.co.community.imagebrowser.repository.ImageRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 
 /**
  * Reads an Excel (.xlsx) file, extracts embedded images + thumbnails,
@@ -63,9 +64,15 @@ public class SpreadsheetImportService {
             String storedVersion      = repository.getConfig(AppConfig.LAST_UPDATED_KEY)
                                                   .orElse(null);
 
-            if (spreadsheetVersion != null && spreadsheetVersion.equals(storedVersion)) {
-                log.info("Spreadsheet unchanged (version={}). Skipping import.", storedVersion);
-                return ImportResult.skipped(spreadsheetVersion);
+            // Database already exists
+            if (storedVersion != null) {
+                LocalDateTime dtSpreadsheetVersion = LocalDateTime.parse(spreadsheetVersion);
+                LocalDateTime dtStoredVersion = LocalDateTime.parse(storedVersion);
+
+                if (!dtSpreadsheetVersion.isAfter(dtStoredVersion)) {
+                    log.info("Spreadsheet unchanged (version={}). Skipping import.", storedVersion);
+                    return ImportResult.skipped(spreadsheetVersion);
+                }
             }
 
             log.info("Spreadsheet changed ({} → {}). Starting full import.",
@@ -168,7 +175,7 @@ public class SpreadsheetImportService {
         if (meta == null) return null;
         var row = meta.getRow(0);
         if (row == null) return null;
-        var cell = row.getCell(0);
+        var cell = row.getCell(1);
         if (cell == null) return null;
         try {
             return cell.getStringCellValue();
