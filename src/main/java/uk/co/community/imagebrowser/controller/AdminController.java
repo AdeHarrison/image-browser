@@ -99,6 +99,32 @@ public class AdminController {
     }
 
     // ---------------------------------------------------------------
+    // Change password
+    // ---------------------------------------------------------------
+
+    @PostMapping("/change-password")
+    @ResponseBody
+    public String changePassword(@RequestParam String currentPassword,
+                                  @RequestParam String newPassword,
+                                  @RequestParam String confirmPassword,
+                                  HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return "<p class='error'>Not authorised.</p>";
+        }
+        if (!passwordService.verify(currentPassword)) {
+            return "<p class='error'>Current password is incorrect.</p>";
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            return "<p class='error'>New passwords do not match.</p>";
+        }
+        if (!passwordService.setPassword(newPassword)) {
+            return "<p class='error'>New password must be at least %d characters.</p>"
+                    .formatted(AdminPasswordService.MIN_PASSWORD_LENGTH);
+        }
+        return "<p class='success'>✓ Password changed successfully.</p>";
+    }
+
+    // ---------------------------------------------------------------
     // Logout
     // ---------------------------------------------------------------
 

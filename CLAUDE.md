@@ -81,7 +81,10 @@ The admin password is stored as a one-way BCrypt hash in the `app_config` table
 (key `admin_password_hash`, see `AppConfig.ADMIN_PASSWORD_HASH_KEY`). `AdminPasswordService.load()`
 calls `repository.createSchema()` (idempotent) before reading config, since its `@PostConstruct`
 isn't ordered relative to `DatabaseInitialiser`'s. If no hash is stored yet, it seeds one for the
-default password `BoSPhotoViewer`.
+default password `changeme`. Admins can change it via `POST /admin/change-password`
+(`AdminController.changePassword`), which verifies the current password, checks the new password
+against `confirmPassword`, and enforces `AdminPasswordService.MIN_PASSWORD_LENGTH` via
+`setPassword()`.
 
 ## Conventions
 

@@ -16,11 +16,18 @@
         .btn-logout   { padding: 0.5rem 1rem; background: #888; color: white;
                         border: none; border-radius: 4px; cursor: pointer; margin-top: 2rem; }
         .btn-logout:hover   { background: #666; }
-        #reload-status .success { color: green; font-weight: bold; }
-        #reload-status .error   { color: red; }
+        #reload-status .success,
+        #password-status .success { color: green; font-weight: bold; }
+        #reload-status .error,
+        #password-status .error   { color: red; }
         .spinner { display: none; margin-left: 0.5rem; }
         .htmx-request .spinner { display: inline; }
         hr { margin: 2rem 0; border: none; border-top: 1px solid #eee; }
+        .password-form input { width: 100%; padding: 0.5rem; font-size: 1rem;
+                                margin: 0.4rem 0 1rem; box-sizing: border-box; }
+        .btn-change-password { padding: 0.6rem 1.2rem; background: #0066cc; color: white;
+                                border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; }
+        .btn-change-password:hover { background: #0052a3; }
     </style>
 </head>
 <body>
@@ -42,6 +49,24 @@
     <span class="spinner htmx-indicator">⏳ Reloading...</span>
 
     <div id="reload-status"></div>
+
+    <hr>
+
+    <h3>Change Admin Password</h3>
+    <form class="password-form" hx-post="/admin/change-password" hx-target="#password-status">
+        <label for="currentPassword">Current password</label>
+        <input type="password" id="currentPassword" name="currentPassword" required>
+
+        <label for="newPassword">New password</label>
+        <input type="password" id="newPassword" name="newPassword" required>
+
+        <label for="confirmPassword">Confirm new password</label>
+        <input type="password" id="confirmPassword" name="confirmPassword" required>
+
+        <button type="submit" class="btn-change-password">Change Password</button>
+    </form>
+
+    <div id="password-status"></div>
 
     <hr>
 

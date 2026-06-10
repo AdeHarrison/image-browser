@@ -165,6 +165,81 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("POST /admin/change-password without session returns not authorised")
+    void changePassword_WhenNoSession_ShouldReturnNotAuthorised() throws Exception {
+        mvc.perform(post("/admin/change-password")
+                .param("currentPassword", "old")
+                .param("newPassword", "newPassword1")
+                .param("confirmPassword", "newPassword1"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Not authorised")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/change-password with incorrect current password returns error")
+    void changePassword_WhenCurrentPasswordWrong_ShouldReturnError() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.verify("wrong")).thenReturn(false);
+
+        mvc.perform(post("/admin/change-password")
+                .sessionAttr("admin", true)
+                .param("currentPassword", "wrong")
+                .param("newPassword", "newPassword1")
+                .param("confirmPassword", "newPassword1"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Current password is incorrect")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/change-password with mismatched new passwords returns error")
+    void changePassword_WhenNewPasswordsMismatch_ShouldReturnError() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.verify("correct")).thenReturn(true);
+
+        mvc.perform(post("/admin/change-password")
+                .sessionAttr("admin", true)
+                .param("currentPassword", "correct")
+                .param("newPassword", "newPassword1")
+                .param("confirmPassword", "different"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("do not match")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/change-password with a too-short new password returns error")
+    void changePassword_WhenNewPasswordTooShort_ShouldReturnError() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.verify("correct")).thenReturn(true);
+        when(passwordService.setPassword("short")).thenReturn(false);
+
+        mvc.perform(post("/admin/change-password")
+                .sessionAttr("admin", true)
+                .param("currentPassword", "correct")
+                .param("newPassword", "short")
+                .param("confirmPassword", "short"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("at least")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/change-password with a valid new password succeeds")
+    void changePassword_WhenValid_ShouldUpdatePasswordAndReturnSuccess() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.verify("correct")).thenReturn(true);
+        when(passwordService.setPassword("newPassword1")).thenReturn(true);
+
+        mvc.perform(post("/admin/change-password")
+                .sessionAttr("admin", true)
+                .param("currentPassword", "correct")
+                .param("newPassword", "newPassword1")
+                .param("confirmPassword", "newPassword1"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Password changed successfully")));
+
+        verify(passwordService).setPassword("newPassword1");
+    }
+
+    @Test
     @DisplayName("POST /admin/logout without session redirects to /")
     void logout_WhenNoSession_ShouldRedirectToRoot() throws Exception {
         mvc.perform(post("/admin/logout"))

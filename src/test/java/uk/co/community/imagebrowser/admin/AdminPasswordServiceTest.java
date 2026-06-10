@@ -46,7 +46,7 @@ class AdminPasswordServiceTest {
 
         svc.load();
 
-        assertThat(svc.verify("BoSPhotoViewer")).isTrue();
+        assertThat(svc.verify("changeme")).isTrue();
         assertThat(svc.verify("wrong")).isFalse();
         assertThat(repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)).isPresent();
     }
@@ -61,7 +61,7 @@ class AdminPasswordServiceTest {
         svc.load();
 
         assertThat(svc.verify("s3cret")).isTrue();
-        assertThat(svc.verify("BoSPhotoViewer")).isFalse();
+        assertThat(svc.verify("changeme")).isFalse();
         assertThat(repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)).contains(existingHash);
     }
 
@@ -72,5 +72,42 @@ class AdminPasswordServiceTest {
         svc.load();
 
         assertThat(svc.verify(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("setPassword stores a new hash and verify accepts the new password")
+    void setPassword_WithValidPassword_ShouldUpdateStoredHash() {
+        var svc = new AdminPasswordService(repository);
+        svc.load();
+
+        assertThat(svc.setPassword("newSecurePassword")).isTrue();
+
+        assertThat(svc.verify("newSecurePassword")).isTrue();
+        assertThat(svc.verify("changeme")).isFalse();
+
+        String storedHash = repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY).orElseThrow();
+        assertThat(new BCryptPasswordEncoder().matches("newSecurePassword", storedHash)).isTrue();
+    }
+
+    @Test
+    @DisplayName("setPassword rejects passwords shorter than the minimum length")
+    void setPassword_WithShortPassword_ShouldReturnFalseAndLeaveHashUnchanged() {
+        var svc = new AdminPasswordService(repository);
+        svc.load();
+
+        assertThat(svc.setPassword("short")).isFalse();
+
+        assertThat(svc.verify("changeme")).isTrue();
+        assertThat(svc.verify("short")).isFalse();
+    }
+
+    @Test
+    @DisplayName("setPassword rejects a null password")
+    void setPassword_WithNullPassword_ShouldReturnFalse() {
+        var svc = new AdminPasswordService(repository);
+        svc.load();
+
+        assertThat(svc.setPassword(null)).isFalse();
+        assertThat(svc.verify("changeme")).isTrue();
     }
 }

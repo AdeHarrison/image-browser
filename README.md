@@ -103,8 +103,8 @@ java -Xmx512m -jar image-browser-1.0.0.jar
 
 The admin password is stored as a one-way (BCrypt) hash in the `app_config` table of `images.db`.
 On first run, no hash exists yet, so the app seeds one for the default password
-`BoSPhotoViewer` — **always change this before deploying** by updating the
-`admin_password_hash` row in `app_config` with a hash of your chosen password.
+`changeme` — **always change this before deploying**, via **Admin Panel → Change Admin
+Password** (requires the current password).
 
 ---
 

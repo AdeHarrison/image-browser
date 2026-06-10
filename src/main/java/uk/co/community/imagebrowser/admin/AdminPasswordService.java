@@ -20,9 +20,12 @@ public class AdminPasswordService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminPasswordService.class);
 
-    /** BCrypt hash of the default password, used to seed app_config on first run. */
+    /** Minimum length enforced when setting a new admin password. */
+    public static final int MIN_PASSWORD_LENGTH = 8;
+
+    /** BCrypt hash of the default password ("changeme"), used to seed app_config on first run. */
     private static final String DEFAULT_PASSWORD_HASH =
-            "$2a$10$OhE9FeffFTAElNYejF2Mae1rbT8qBl2Il0CLcyi7oV0MmV31zUnaG";
+            "$2a$10$IIrVDAuaaw8LdH5fttpjg.XFj6XQU0Phfv/uJ5LYL5KNOJDr8VkDa";
 
     private final ImageRepository repository;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
@@ -47,5 +50,20 @@ public class AdminPasswordService {
 
     public boolean verify(String candidate) {
         return candidate != null && encoder.matches(candidate, passwordHash);
+    }
+
+    /**
+     * Hash and persist a new admin password.
+     *
+     * @return false if the password is shorter than {@link #MIN_PASSWORD_LENGTH}
+     *         (and nothing is changed); true once the new hash is stored.
+     */
+    public boolean setPassword(String newPassword) {
+        if (newPassword == null || newPassword.length() < MIN_PASSWORD_LENGTH) {
+            return false;
+        }
+        passwordHash = encoder.encode(newPassword);
+        repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, passwordHash);
+        return true;
     }
 }
