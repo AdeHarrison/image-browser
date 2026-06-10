@@ -5,4 +5,5 @@ package uk.co.community.imagebrowser.model;
  */
 public record AppConfig(String key, String value) {
     public static final String LAST_UPDATED_KEY = "last_updated";
+    public static final String ADMIN_PASSWORD_HASH_KEY = "admin_password_hash";
 }

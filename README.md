@@ -69,8 +69,7 @@ Place these files in the same folder on the target PC:
 C:\ImageBrowser\
     image-browser-1.0.0.jar
     spreadsheet.xlsx          ← source spreadsheet (see format below)
-    admin.properties          ← admin password (see below)
-    images.db                 ← created automatically on first run
+    images.db                 ← created automatically on first run (also stores admin password hash)
     start.bat                 ← Windows startup script
 ```
 
@@ -102,13 +101,10 @@ java -Xmx512m -jar image-browser-1.0.0.jar
 
 ## Admin Password
 
-Create `admin.properties` next to the JAR:
-
-```properties
-admin.password=YourSecurePasswordHere
-```
-
-If the file is missing, the default password is `changeme` — always change this before deploying.
+The admin password is stored as a one-way (BCrypt) hash in the `app_config` table of `images.db`.
+On first run, no hash exists yet, so the app seeds one for the default password
+`BoSPhotoViewer` — **always change this before deploying** by updating the
+`admin_password_hash` row in `app_config` with a hash of your chosen password.
 
 ---
 
@@ -157,7 +153,6 @@ All configuration is in `application.properties` (or override via environment va
 |---|---|---|
 | `server.port` | `7000` | HTTP port |
 | `app.spreadsheet.path` | `spreadsheet.xlsx` | Path to Excel file |
-| `app.admin.properties` | `admin.properties` | Path to admin password file |
 | `app.thumbnail.max-px` | `128` | Thumbnail longest edge in pixels |
 | `app.thumbnail.jpeg-quality` | `0.75` | JPEG compression quality (0.0–1.0) |
 | `app.cache.thumbnail-max-bytes` | `15728640` | Thumbnail cache size (15MB) |
@@ -291,8 +286,7 @@ src/
     │       ├── SpreadsheetImportServiceTest.java
     │       └── ThumbnailServiceTest.java
     └── resources/
-        ├── application-test.properties
-        └── test-admin.properties
+        └── application-test.properties
 ```
 
 ---

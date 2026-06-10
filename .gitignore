@@ -29,9 +29,6 @@ logs/
 identifier.sqlite
 :memory:?cache=shared
 
-# Local admin secret (use admin.properties.example as a template)
-admin.properties
-
 # IntelliJ IDEA
 .idea/
 *.iml

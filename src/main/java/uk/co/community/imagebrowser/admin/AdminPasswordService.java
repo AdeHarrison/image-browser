@@ -3,55 +3,49 @@ package uk.co.community.imagebrowser.admin;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Properties;
+import uk.co.community.imagebrowser.model.AppConfig;
+import uk.co.community.imagebrowser.repository.ImageRepository;
 
 /**
- * Loads the admin password from an external properties file.
- * This keeps the password out of the JAR and allows non-technical
- * volunteers to change it by editing a text file.
+ * Stores the admin password as a one-way BCrypt hash in the {@code app_config}
+ * table (key {@value AppConfig#ADMIN_PASSWORD_HASH_KEY}).
  *
- * File format (admin.properties):
- *   admin.password=yourpassword
+ * On first run, when no hash is stored yet, a default password is hashed and
+ * persisted so the admin panel is reachable out of the box.
  */
 @Service
 public class AdminPasswordService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminPasswordService.class);
 
-    private final Path   propertiesPath;
-    private       String password;
+    /** BCrypt hash of the default password, used to seed app_config on first run. */
+    private static final String DEFAULT_PASSWORD_HASH =
+            "$2a$10$OhE9FeffFTAElNYejF2Mae1rbT8qBl2Il0CLcyi7oV0MmV31zUnaG";
 
-    public AdminPasswordService(
-            @Value("${app.admin.properties:admin.properties}") String propertiesPath) {
-        this.propertiesPath = Path.of(propertiesPath);
+    private final ImageRepository repository;
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    private String passwordHash;
+
+    public AdminPasswordService(ImageRepository repository) {
+        this.repository = repository;
     }
 
     @PostConstruct
     public void load() {
-        if (!Files.exists(propertiesPath)) {
-            log.warn("Admin properties file not found at '{}'. Using default password. " +
-                     "Create the file to set a secure password.", propertiesPath);
-            password = "changeme";
-            return;
-        }
-        try {
-            var props = new Properties();
-            props.load(Files.newInputStream(propertiesPath));
-            password = props.getProperty("admin.password", "changeme");
-            log.info("Admin password loaded from {}", propertiesPath);
-        } catch (IOException e) {
-            log.error("Failed to load admin properties: {}", e.getMessage());
-            password = "changeme";
-        }
+        repository.createSchema();
+
+        passwordHash = repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)
+                .orElseGet(() -> {
+                    log.warn("No admin password set. Seeding default password — change it before deploying.");
+                    repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, DEFAULT_PASSWORD_HASH);
+                    return DEFAULT_PASSWORD_HASH;
+                });
     }
 
     public boolean verify(String candidate) {
-        return password != null && password.equals(candidate);
+        return candidate != null && encoder.matches(candidate, passwordHash);
     }
 }

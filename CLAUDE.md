@@ -77,8 +77,11 @@ bytes are fetched only by the dedicated binary endpoints.
 **Admin single-session (`admin/AdminSessionManager`).** A single `AtomicReference<String>` holds the
 one allowed admin session id; `login`/`logout` are lock-free `compareAndSet`. Auth checks in
 `AdminController` require both the `admin` HttpSession attribute AND `isActiveSession(sessionId)`.
-The admin password is loaded by `AdminPasswordService` from the external `admin.properties` file
-(`app.admin.properties`), defaulting to `changeme` if absent.
+The admin password is stored as a one-way BCrypt hash in the `app_config` table
+(key `admin_password_hash`, see `AppConfig.ADMIN_PASSWORD_HASH_KEY`). `AdminPasswordService.load()`
+calls `repository.createSchema()` (idempotent) before reading config, since its `@PostConstruct`
+isn't ordered relative to `DatabaseInitialiser`'s. If no hash is stored yet, it seeds one for the
+default password `BoSPhotoViewer`.
 
 ## Conventions
 

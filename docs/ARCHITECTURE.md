@@ -69,8 +69,10 @@ Three things happen in order, driven by Spring lifecycle hooks:
 
 Notes:
 
-- `AdminPasswordService.load()` (also `@PostConstruct`) runs independently —
-  reads `admin.properties`, falling back to `changeme` if the file is absent.
+- `AdminPasswordService.load()` (also `@PostConstruct`) runs independently — it calls
+  `repository.createSchema()` itself (idempotent) to avoid relying on init order, then reads
+  the BCrypt hash from `app_config` (`admin_password_hash`), seeding a hash of the default
+  password `BoSPhotoViewer` on first run.
 - If the spreadsheet import throws, `DatabaseInitialiser` logs the error but
   does **not** fail startup — the app still serves whatever is already in
   `images.db`.

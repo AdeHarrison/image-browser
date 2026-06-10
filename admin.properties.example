@@ -1,4 +1,0 @@
-# Community Image Browser — Admin Password
-# Copy this file to admin.properties and set a strong password before deploying.
-# Keep admin.properties out of version control (it is gitignored).
-admin.password=changeme
