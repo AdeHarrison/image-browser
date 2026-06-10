@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Locally-hosted image browser for community centres (Spring Boot 4, Java 21). Images are
 extracted from embedded pictures in an Excel `.xlsx` workbook, stored in SQLite as BLOBs, and
-served to a browser UI. See `README.md` for deployment/operations detail.
+served to a browser UI. See `README.md` for deployment/operations detail and `docs/ARCHITECTURE.md`
+for diagrams of the class structure and runtime flows.
 
 ## Commands
 
@@ -36,11 +37,14 @@ Caffeine cache fronting BLOB reads.
 3. `ImageCacheService.schedulePreload()` — async warm-up of the thumbnail cache (`@Async`,
    enabled via `@EnableAsync` on the application class).
 
-**Version-gated import.** The importer reads a timestamp string from cell `A1` of a sheet named
-`Metadata` and compares it to the `last_updated` row in the `app_config` table. Equal → import is
-skipped (fast startup). Different/absent stored value → `clearAll()` + full reimport + cache
+**Version-gated import.** The importer reads a timestamp string from cell `B1` of a sheet named
+`Metadata` and compares it to the `last_updated` row in the `app_config` table, both parsed as
+`LocalDateTime` (ISO format, e.g. `2026-05-22T10:30:00`). If a stored version exists and the
+spreadsheet's timestamp is not *after* it → import is skipped (fast startup). Otherwise (no stored
+version yet, or the spreadsheet timestamp is later) → `clearAll()` + full reimport + cache
 invalidate. Admin "reload" calls `forceImport()`, which reimports unconditionally. **Editing images
-in the spreadsheet without changing `Metadata!A1` will NOT trigger a reimport.**
+in the spreadsheet without advancing `Metadata!B1` to a later timestamp will NOT trigger a
+reimport.**
 
 **SQLite schema is maintained manually, not by ORM or FTS triggers.** `images_fts` is an FTS5
 external-content table (`content='images'`) but there are **no sync triggers** — `ImageRepository.insert()`
