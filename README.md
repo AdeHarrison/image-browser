@@ -193,6 +193,10 @@ Navigate to [http://localhost:7000/admin/login](http://localhost:7000/admin/logi
 
 ## Architecture
 
+For class diagrams, an ER diagram, and sequence diagrams covering startup,
+spreadsheet import, search/browse, image viewing, caching, and the admin
+flows, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ```
 Browser (HTMX)
     │

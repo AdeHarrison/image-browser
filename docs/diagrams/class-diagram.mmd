@@ -1,0 +1,220 @@
+classDiagram
+    class ImageBrowserApplication {
+        <<@SpringBootApplication>>
+        <<@EnableCaching @EnableAsync>>
+        +main(String[] args)
+    }
+
+    %% ---------------- config ----------------
+    class DatabaseInitialiser {
+        <<@Component>>
+        -ImageRepository repository
+        -SpreadsheetImportService importService
+        +initialise() @PostConstruct
+    }
+
+    class SessionConfig {
+        <<@Configuration>>
+        +sessionListener(AdminSessionManager) Bean
+        +cookieSerializer() Bean
+    }
+
+    %% ---------------- controller ----------------
+    class ImageController {
+        <<@Controller>>
+        -ImageSearchService searchService
+        -ImageCacheService cacheService
+        +index(Model) String
+        +search(q, page) String
+        +modal(id) String
+        +viewer(id) String
+        +thumbnail(id) ResponseEntity~byte[]~
+        +fullImage(id) ResponseEntity~byte[]~
+        -escapeHtml(s) String
+        -truncate(s, max) String
+    }
+
+    class AdminController {
+        <<@Controller "/admin">>
+        -AdminSessionManager sessionManager
+        -AdminPasswordService passwordService
+        -SpreadsheetImportService importService
+        +loginPage(req, Model) String
+        +login(password, req) String
+        +adminPanel(req, Model) String
+        +reload(req) String
+        +logout(req) String
+        -isAdmin(req) boolean
+    }
+
+    %% ---------------- service ----------------
+    class ImageSearchService {
+        <<@Service>>
+        -ImageRepository repository
+        -int pageSize
+        +search(query, page) List~ImageSummary~
+        +findById(id) Optional~ImageSummary~
+        +getNavigationContext(id) NavigationContext
+        +count() long
+    }
+
+    class NavigationContext {
+        <<record>>
+        +Long firstId
+        +Long prevId
+        +Long nextId
+        +Long lastId
+        +long currentId
+        +hasPrev() boolean
+        +hasNext() boolean
+        +isFirst() boolean
+        +isLast() boolean
+    }
+
+    class ImageCacheService {
+        <<@Service>>
+        -ImageRepository repository
+        -Cache~Long,byte[]~ thumbnailCache
+        -Cache~Long,byte[]~ fullImageCache
+        -boolean preloadEnabled
+        +getThumbnail(id) Optional~byte[]~
+        +getFullImage(id) Optional~byte[]~
+        +invalidateAll()
+        +schedulePreload() "@EventListener(ApplicationReadyEvent)"
+        +preloadThumbnailsAsync() "@Async"
+        +logStats()
+    }
+
+    class SpreadsheetImportService {
+        <<@Service>>
+        -ImageRepository repository
+        -ThumbnailService thumbnailService
+        -ImageCacheService cacheService
+        -Path spreadsheetPath
+        +importIfUpdated() ImportResult
+        +forceImport() ImportResult
+        -importImages(workbook) int
+        -readLastUpdated(workbook) String
+    }
+
+    class ImportResult {
+        <<record>>
+        +Status status
+        +int imagesImported
+        +String version
+        +String message
+        +success(count, version)$ ImportResult
+        +skipped(version)$ ImportResult
+        +notFound(path)$ ImportResult
+    }
+
+    class ThumbnailService {
+        <<@Service>>
+        -int maxPx
+        -float jpegQuality
+        +createThumbnail(bytes) byte[]
+        +isVectorFormat(ext) boolean
+        ~decode(bytes) BufferedImage
+        ~scale(src, maxEdgePx) BufferedImage
+        ~encodeAsJpeg(img, quality) byte[]
+    }
+
+    %% ---------------- repository ----------------
+    class ImageRepository {
+        <<@Repository>>
+        -JdbcTemplate jdbc
+        +createSchema()
+        +insert(ImageRecord) long
+        +search(query, offset, limit) List~ImageSummary~
+        +findAll(offset, limit) List~ImageSummary~
+        +findSummaryById(id) Optional~ImageSummary~
+        +findThumbnailById(id) Optional~byte[]~
+        +findFullImageById(id) Optional~byte[]~
+        +findFirstId() Optional~Long~
+        +findPrevId(id) Optional~Long~
+        +findNextId(id) Optional~Long~
+        +findLastId() Optional~Long~
+        +findAllIds() List~Long~
+        +count() long
+        +getConfig(key) Optional~String~
+        +setConfig(key, value)
+        +clearAll()
+    }
+
+    %% ---------------- admin ----------------
+    class AdminPasswordService {
+        <<@Service>>
+        -Path propertiesPath
+        -String password
+        +load() @PostConstruct
+        +verify(candidate) boolean
+    }
+
+    class AdminSessionManager {
+        <<@Component>>
+        -AtomicReference~String~ activeSessionId
+        +login(sessionId) boolean
+        +logout(sessionId)
+        +isAdminLoggedIn() boolean
+        +isActiveSession(sessionId) boolean
+        +forceLogout(sessionId)
+    }
+
+    %% ---------------- model ----------------
+    class ImageRecord {
+        <<record>>
+        +long id
+        +String filename
+        +String sheetName
+        +String cellRef
+        +String mimeType
+        +byte[] fullImage
+        +byte[] thumbnail
+        +int widthPx
+        +int heightPx
+        +String tags
+        +String description
+    }
+
+    class ImageSummary {
+        <<record, no BLOBs>>
+        +long id
+        +String filename
+        +String sheetName
+        +String cellRef
+        +int widthPx
+        +int heightPx
+        +String tags
+        +String description
+    }
+
+    class AppConfig {
+        <<record>>
+        +String key
+        +String value
+        +LAST_UPDATED_KEY$ String
+    }
+
+    %% ---------------- relationships ----------------
+    DatabaseInitialiser --> ImageRepository
+    DatabaseInitialiser --> SpreadsheetImportService
+    SessionConfig --> AdminSessionManager
+
+    ImageController --> ImageSearchService
+    ImageController --> ImageCacheService
+
+    AdminController --> AdminSessionManager
+    AdminController --> AdminPasswordService
+    AdminController --> SpreadsheetImportService
+
+    ImageSearchService --> ImageRepository
+    ImageSearchService ..> NavigationContext : creates
+    ImageCacheService --> ImageRepository
+    SpreadsheetImportService --> ImageRepository
+    SpreadsheetImportService --> ThumbnailService
+    SpreadsheetImportService --> ImageCacheService
+    SpreadsheetImportService ..> ImportResult : returns
+
+    ImageRepository ..> ImageRecord : insert
+    ImageRepository ..> ImageSummary : queries return
+    ImageRepository ..> AppConfig : key/value config

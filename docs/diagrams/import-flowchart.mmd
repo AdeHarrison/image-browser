@@ -1,0 +1,14 @@
+flowchart TD
+    Start([importIfUpdated]) --> Exists{spreadsheet.xlsx exists?}
+    Exists -- no --> NotFound[return NOT_FOUND]
+    Exists -- yes --> ReadVer["readLastUpdated(workbook)<br/>Metadata sheet, row 0, cell B1"]
+    ReadVer --> GetStored["repository.getConfig('last_updated')"]
+    GetStored --> StoredExists{storedVersion present?}
+    StoredExists -- no --> DoImport[clearAll + invalidateAll + import all images]
+    StoredExists -- yes --> Compare{"spreadsheetVersion.isAfter(storedVersion)?"}
+    Compare -- no --> Skipped[return SKIPPED]
+    Compare -- yes --> DoImport
+    DoImport --> SetVer["setConfig('last_updated', spreadsheetVersion)"]
+    SetVer --> Success[return SUCCESS, count]
+
+    AdminReload([Admin: forceImport]) -. bypasses version check .-> DoImport
