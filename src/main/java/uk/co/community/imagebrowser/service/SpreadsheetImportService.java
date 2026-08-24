@@ -15,13 +15,13 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 
 /**
- * Reads an Excel (.xlsx) file, extracts embedded images + thumbnails,
- * and persists them to SQLite.
+ * Reads an Excel (.xlsx) file and extracts embedded images + thumbnails.
  *
- * Checks a version string, configured via app.spreadsheet.version, before
- * importing — if it matches what's already stored, the import is skipped.
- * There is no longer any in-spreadsheet timestamp cell; the version is a
- * plain config value that must be bumped manually to trigger a reimport.
+ * DB-backed persistence and the last-updated version check are disabled for
+ * now (see commented-out code below) — this class currently just counts what
+ * it finds in the workbook. Nothing calls this class currently; the admin
+ * "reload" action uses OutputSyncService instead. Re-enable once the
+ * importer/schema rework for the new spreadsheet format is done.
  */
 @Service
 public class SpreadsheetImportService {
@@ -50,7 +50,9 @@ public class SpreadsheetImportService {
 
     /**
      * Import images from the configured spreadsheet.
-     * Skips if the spreadsheet's last-updated value matches what is stored in the DB.
+     *
+     * DB-backed last-updated version checking is disabled for now (see comments
+     * below) — this always does a full pass over the workbook.
      *
      * @return ImportResult describing what happened
      */
@@ -63,30 +65,32 @@ public class SpreadsheetImportService {
         try (var fis      = Files.newInputStream(spreadsheetPath);
              var workbook = new XSSFWorkbook(fis)) {
 
-            String storedVersion = repository.getConfig(AppConfig.LAST_UPDATED_KEY)
-                                              .orElse(null);
+            // Last-updated version check against the DB is disabled for now —
+            // always import.
+            //
+            // String storedVersion = repository.getConfig(AppConfig.LAST_UPDATED_KEY)
+            //                                   .orElse(null);
+            //
+            // if (storedVersion != null && configuredVersion != null) {
+            //     LocalDateTime dtConfiguredVersion = LocalDateTime.parse(configuredVersion);
+            //     LocalDateTime dtStoredVersion     = LocalDateTime.parse(storedVersion);
+            //
+            //     if (!dtConfiguredVersion.isAfter(dtStoredVersion)) {
+            //         log.info("Spreadsheet unchanged (version={}). Skipping import.", storedVersion);
+            //         return ImportResult.skipped(configuredVersion);
+            //     }
+            // }
 
-            if (storedVersion != null && configuredVersion != null) {
-                LocalDateTime dtConfiguredVersion = LocalDateTime.parse(configuredVersion);
-                LocalDateTime dtStoredVersion     = LocalDateTime.parse(storedVersion);
+            log.info("Starting full import (DB-backed version check disabled).");
 
-                if (!dtConfiguredVersion.isAfter(dtStoredVersion)) {
-                    log.info("Spreadsheet unchanged (version={}). Skipping import.", storedVersion);
-                    return ImportResult.skipped(configuredVersion);
-                }
-            }
-
-            log.info("Spreadsheet changed ({} → {}). Starting full import.",
-                    storedVersion, configuredVersion);
-
-            repository.clearAll();
-            cacheService.invalidateAll();
+            // repository.clearAll();
+            // cacheService.invalidateAll();
 
             int imported = importImages(workbook);
 
-            if (configuredVersion != null) {
-                repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
-            }
+            // if (configuredVersion != null) {
+            //     repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
+            // }
 
             log.info("Import complete. {} images imported.", imported);
             return ImportResult.success(imported, configuredVersion);
@@ -94,7 +98,8 @@ public class SpreadsheetImportService {
     }
 
     /**
-     * Force a full reimport regardless of version.
+     * Force a full reimport. Currently identical to importIfUpdated() since the
+     * version check is disabled — kept separate for when DB persistence returns.
      */
     public ImportResult forceImport() throws IOException {
         if (!Files.exists(spreadsheetPath)) {
@@ -103,12 +108,12 @@ public class SpreadsheetImportService {
         try (var fis      = Files.newInputStream(spreadsheetPath);
              var workbook = new XSSFWorkbook(fis)) {
 
-            repository.clearAll();
-            cacheService.invalidateAll();
+            // repository.clearAll();
+            // cacheService.invalidateAll();
             int imported = importImages(workbook);
-            if (configuredVersion != null) {
-                repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
-            }
+            // if (configuredVersion != null) {
+            //     repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
+            // }
             log.info("Force import complete. {} images imported.", imported);
             return ImportResult.success(imported, configuredVersion);
         }
@@ -163,7 +168,7 @@ public class SpreadsheetImportService {
                         ""   // description
                 );
 
-                repository.insert(record);
+                // repository.insert(record);
                 count++;
             }
         }

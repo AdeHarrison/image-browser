@@ -10,14 +10,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uk.co.community.imagebrowser.model.AppConfig;
 import uk.co.community.imagebrowser.repository.ImageRepository;
 import uk.co.community.imagebrowser.service.SpreadsheetImportService.ImportResult;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -57,101 +55,49 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("forceImport reimports unconditionally without consulting the stored version")
-    void forceImport_WhenSpreadsheetPresent_ShouldReimportIgnoringStoredVersion(@TempDir Path dir) throws IOException {
+    @DisplayName("forceImport imports without touching the DB (DB persistence disabled)")
+    void forceImport_WhenSpreadsheetPresent_ShouldImportWithoutTouchingDb(@TempDir Path dir) throws IOException {
         Path file = writeEmptyWorkbook(dir);
 
         var result = serviceFor(file, "2026-05-22T10:30:00").forceImport();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.version()).isEqualTo("2026-05-22T10:30:00");
-        verify(repository, never()).getConfig(any());
-        verify(repository).clearAll();
-        verify(cacheService).invalidateAll();
-        verify(repository).setConfig(AppConfig.LAST_UPDATED_KEY, "2026-05-22T10:30:00");
-    }
-
-    @Test
-    @DisplayName("forceImport imports but does not store a version when none is configured")
-    void forceImport_WhenVersionAbsent_ShouldImportWithoutSettingConfig(@TempDir Path dir) throws IOException {
-        Path file = writeEmptyWorkbook(dir);
-
-        var result = serviceFor(file, null).forceImport();
-
-        assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
-        assertThat(result.version()).isNull();
-        verify(repository).clearAll();
-        verify(cacheService).invalidateAll();
-        verify(repository, never()).setConfig(any(), any());
+        verifyNoInteractions(repository, cacheService);
     }
 
     // ---------------------------------------------------------------
-    // importIfUpdated — version-gating (import only if spreadsheet is newer)
+    // importIfUpdated — DB-backed version check is disabled; always imports
     // ---------------------------------------------------------------
 
     @Test
-    @DisplayName("importIfUpdated imports when the DB has no stored version yet")
-    void importIfUpdated_WhenNoStoredVersion_ShouldImport(@TempDir Path dir) throws IOException {
+    @DisplayName("importIfUpdated always imports without touching the DB (version check disabled)")
+    void importIfUpdated_WhenSpreadsheetPresent_ShouldImportWithoutTouchingDb(@TempDir Path dir) throws IOException {
         Path file = writeEmptyWorkbook(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
 
         var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
-        verify(repository).clearAll();
-        verify(cacheService).invalidateAll();
-        verify(repository).setConfig(AppConfig.LAST_UPDATED_KEY, "2026-05-22T10:30:00");
+        assertThat(result.version()).isEqualTo("2026-05-22T10:30:00");
+        verifyNoInteractions(repository, cacheService);
     }
 
     @Test
-    @DisplayName("importIfUpdated imports when the configured version is after the stored version")
-    void importIfUpdated_WhenSpreadsheetNewerThanStored_ShouldImport(@TempDir Path dir) throws IOException {
+    @DisplayName("importIfUpdated imports even with no configured version")
+    void importIfUpdated_WhenNoConfiguredVersion_ShouldImportWithoutTouchingDb(@TempDir Path dir) throws IOException {
         Path file = writeEmptyWorkbook(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
-                .thenReturn(Optional.of("2026-05-21T10:30:00"));
-
-        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
-
-        assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
-        verify(repository).clearAll();
-        verify(cacheService).invalidateAll();
-        verify(repository).setConfig(AppConfig.LAST_UPDATED_KEY, "2026-05-22T10:30:00");
-    }
-
-    @Test
-    @DisplayName("importIfUpdated skips when the configured version equals the stored version")
-    void importIfUpdated_WhenSpreadsheetEqualsStored_ShouldSkip(@TempDir Path dir) throws IOException {
-        Path file = writeEmptyWorkbook(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
-                .thenReturn(Optional.of("2026-05-22T10:30:00"));
-
-        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
-
-        assertThat(result.status()).isEqualTo(ImportResult.Status.SKIPPED);
-        verify(repository, never()).clearAll();
-        verify(repository, never()).setConfig(any(), any());
-        verify(cacheService, never()).invalidateAll();
-    }
-
-    @Test
-    @DisplayName("importIfUpdated imports but stores no version when none is configured")
-    void importIfUpdated_WhenNoStoredVersionAndNoConfiguredVersion_ShouldImportWithoutSettingConfig(@TempDir Path dir) throws IOException {
-        Path file = writeEmptyWorkbook(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
 
         var result = serviceFor(file, null).importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.version()).isNull();
-        verify(repository).clearAll();
-        verify(repository, never()).setConfig(any(), any());
+        verifyNoInteractions(repository, cacheService);
     }
 
     @Test
-    @DisplayName("importIfUpdated extracts and inserts an embedded picture")
-    void importIfUpdated_WhenWorkbookHasPicture_ShouldImportImage(@TempDir Path dir) throws IOException {
+    @DisplayName("importIfUpdated extracts an embedded picture without inserting it into the DB")
+    void importIfUpdated_WhenWorkbookHasPicture_ShouldCountImageWithoutTouchingDb(@TempDir Path dir) throws IOException {
         Path file = writeWorkbookWithPicture(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(false);
         when(thumbnailService.createThumbnail(any())).thenReturn(new byte[]{9});
 
@@ -159,28 +105,26 @@ class SpreadsheetImportServiceTest {
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isEqualTo(1);
-        verify(repository).insert(any());
+        verifyNoInteractions(repository, cacheService);
     }
 
     @Test
     @DisplayName("importIfUpdated skips vector images")
     void importIfUpdated_WhenPictureIsVector_ShouldSkipImage(@TempDir Path dir) throws IOException {
         Path file = writeWorkbookWithPicture(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(true);
 
         var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isZero();
-        verify(repository, never()).insert(any());
+        verifyNoInteractions(repository, cacheService);
     }
 
     @Test
     @DisplayName("importIfUpdated skips images whose thumbnail cannot be created")
     void importIfUpdated_WhenThumbnailEmpty_ShouldSkipImage(@TempDir Path dir) throws IOException {
         Path file = writeWorkbookWithPicture(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(false);
         when(thumbnailService.createThumbnail(any())).thenReturn(new byte[0]);
 
@@ -188,22 +132,7 @@ class SpreadsheetImportServiceTest {
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isZero();
-        verify(repository, never()).insert(any());
-    }
-
-    @Test
-    @DisplayName("importIfUpdated skips when the configured version is before the stored version")
-    void importIfUpdated_WhenSpreadsheetOlderThanStored_ShouldSkip(@TempDir Path dir) throws IOException {
-        Path file = writeEmptyWorkbook(dir);
-        when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
-                .thenReturn(Optional.of("2026-05-22T10:30:00"));
-
-        var result = serviceFor(file, "2026-05-20T10:30:00").importIfUpdated();
-
-        assertThat(result.status()).isEqualTo(ImportResult.Status.SKIPPED);
-        verify(repository, never()).clearAll();
-        verify(repository, never()).setConfig(any(), any());
-        verify(cacheService, never()).invalidateAll();
+        verifyNoInteractions(repository, cacheService);
     }
 
     // ---------------------------------------------------------------
