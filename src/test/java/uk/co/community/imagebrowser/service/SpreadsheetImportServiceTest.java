@@ -36,7 +36,7 @@ class SpreadsheetImportServiceTest {
     void setUp() {
         service = new SpreadsheetImportService(
                 repository, thumbnailService, cacheService,
-                "nonexistent-spreadsheet.xlsx");
+                "nonexistent-spreadsheet.xlsx", null);
     }
 
     @Test
@@ -59,9 +59,9 @@ class SpreadsheetImportServiceTest {
     @Test
     @DisplayName("forceImport reimports unconditionally without consulting the stored version")
     void forceImport_WhenSpreadsheetPresent_ShouldReimportIgnoringStoredVersion(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbook(dir, "2026-05-22T10:30:00");
+        Path file = writeEmptyWorkbook(dir);
 
-        var result = serviceFor(file).forceImport();
+        var result = serviceFor(file, "2026-05-22T10:30:00").forceImport();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.version()).isEqualTo("2026-05-22T10:30:00");
@@ -72,11 +72,11 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("forceImport imports but does not store a version when Metadata is absent")
+    @DisplayName("forceImport imports but does not store a version when none is configured")
     void forceImport_WhenVersionAbsent_ShouldImportWithoutSettingConfig(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithoutMetadata(dir);
+        Path file = writeEmptyWorkbook(dir);
 
-        var result = serviceFor(file).forceImport();
+        var result = serviceFor(file, null).forceImport();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.version()).isNull();
@@ -92,10 +92,10 @@ class SpreadsheetImportServiceTest {
     @Test
     @DisplayName("importIfUpdated imports when the DB has no stored version yet")
     void importIfUpdated_WhenNoStoredVersion_ShouldImport(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbook(dir, "2026-05-22T10:30:00");
+        Path file = writeEmptyWorkbook(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         verify(repository).clearAll();
@@ -104,13 +104,13 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("importIfUpdated imports when the spreadsheet date is after the stored date")
+    @DisplayName("importIfUpdated imports when the configured version is after the stored version")
     void importIfUpdated_WhenSpreadsheetNewerThanStored_ShouldImport(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbook(dir, "2026-05-22T10:30:00");
+        Path file = writeEmptyWorkbook(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
                 .thenReturn(Optional.of("2026-05-21T10:30:00"));
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         verify(repository).clearAll();
@@ -119,13 +119,13 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("importIfUpdated skips when the spreadsheet date equals the stored date")
+    @DisplayName("importIfUpdated skips when the configured version equals the stored version")
     void importIfUpdated_WhenSpreadsheetEqualsStored_ShouldSkip(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbook(dir, "2026-05-22T10:30:00");
+        Path file = writeEmptyWorkbook(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
                 .thenReturn(Optional.of("2026-05-22T10:30:00"));
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SKIPPED);
         verify(repository, never()).clearAll();
@@ -134,12 +134,12 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("importIfUpdated imports but stores no version when the Metadata sheet is absent")
-    void importIfUpdated_WhenNoStoredVersionAndNoMetadata_ShouldImportWithoutSettingConfig(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithoutMetadata(dir);
+    @DisplayName("importIfUpdated imports but stores no version when none is configured")
+    void importIfUpdated_WhenNoStoredVersionAndNoConfiguredVersion_ShouldImportWithoutSettingConfig(@TempDir Path dir) throws IOException {
+        Path file = writeEmptyWorkbook(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, null).importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.version()).isNull();
@@ -150,12 +150,12 @@ class SpreadsheetImportServiceTest {
     @Test
     @DisplayName("importIfUpdated extracts and inserts an embedded picture")
     void importIfUpdated_WhenWorkbookHasPicture_ShouldImportImage(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithPicture(dir, "2026-05-22T10:30:00");
+        Path file = writeWorkbookWithPicture(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(false);
         when(thumbnailService.createThumbnail(any())).thenReturn(new byte[]{9});
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isEqualTo(1);
@@ -165,11 +165,11 @@ class SpreadsheetImportServiceTest {
     @Test
     @DisplayName("importIfUpdated skips vector images")
     void importIfUpdated_WhenPictureIsVector_ShouldSkipImage(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithPicture(dir, "2026-05-22T10:30:00");
+        Path file = writeWorkbookWithPicture(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(true);
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isZero();
@@ -179,12 +179,12 @@ class SpreadsheetImportServiceTest {
     @Test
     @DisplayName("importIfUpdated skips images whose thumbnail cannot be created")
     void importIfUpdated_WhenThumbnailEmpty_ShouldSkipImage(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbookWithPicture(dir, "2026-05-22T10:30:00");
+        Path file = writeWorkbookWithPicture(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY)).thenReturn(Optional.empty());
         when(thumbnailService.isVectorFormat(anyString())).thenReturn(false);
         when(thumbnailService.createThumbnail(any())).thenReturn(new byte[0]);
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-22T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SUCCESS);
         assertThat(result.imagesImported()).isZero();
@@ -192,74 +192,18 @@ class SpreadsheetImportServiceTest {
     }
 
     @Test
-    @DisplayName("importIfUpdated skips when the spreadsheet date is before the stored date")
+    @DisplayName("importIfUpdated skips when the configured version is before the stored version")
     void importIfUpdated_WhenSpreadsheetOlderThanStored_ShouldSkip(@TempDir Path dir) throws IOException {
-        Path file = writeWorkbook(dir, "2026-05-20T10:30:00");
+        Path file = writeEmptyWorkbook(dir);
         when(repository.getConfig(AppConfig.LAST_UPDATED_KEY))
                 .thenReturn(Optional.of("2026-05-22T10:30:00"));
 
-        var result = serviceFor(file).importIfUpdated();
+        var result = serviceFor(file, "2026-05-20T10:30:00").importIfUpdated();
 
         assertThat(result.status()).isEqualTo(ImportResult.Status.SKIPPED);
         verify(repository, never()).clearAll();
         verify(repository, never()).setConfig(any(), any());
         verify(cacheService, never()).invalidateAll();
-    }
-
-    // ---------------------------------------------------------------
-    // readLastUpdated
-    // ---------------------------------------------------------------
-
-    @Test
-    @DisplayName("readLastUpdated returns null when Metadata sheet is absent")
-    void readLastUpdated_WhenMetadataSheetAbsent_ShouldReturnNull() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            wb.createSheet("Data");
-            assertThat(service.readLastUpdated(wb)).isNull();
-        }
-    }
-
-    @Test
-    @DisplayName("readLastUpdated returns null when Metadata sheet has no rows")
-    void readLastUpdated_WhenMetadataSheetEmpty_ShouldReturnNull() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            wb.createSheet("Metadata");
-            assertThat(service.readLastUpdated(wb)).isNull();
-        }
-    }
-
-    @Test
-    @DisplayName("readLastUpdated reads B1, ignoring a value in A1")
-    void readLastUpdated_WhenA1AndB1Differ_ShouldReturnB1() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            var row = wb.createSheet("Metadata").createRow(0);
-            row.createCell(0).setCellValue("A1-should-be-ignored");
-            row.createCell(1).setCellValue("2026-05-22T10:30:00");
-
-            assertThat(service.readLastUpdated(wb)).isEqualTo("2026-05-22T10:30:00");
-        }
-    }
-
-    @Test
-    @DisplayName("readLastUpdated returns null when only A1 is populated (B1 empty)")
-    void readLastUpdated_WhenOnlyA1Present_ShouldReturnNull() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            var row = wb.createSheet("Metadata").createRow(0);
-            row.createCell(0).setCellValue("2026-05-22T10:30:00");
-
-            assertThat(service.readLastUpdated(wb)).isNull();
-        }
-    }
-
-    @Test
-    @DisplayName("readLastUpdated returns null when B1 is not a string cell")
-    void readLastUpdated_WhenB1NotString_ShouldReturnNull() throws IOException {
-        try (var wb = new XSSFWorkbook()) {
-            var row = wb.createSheet("Metadata").createRow(0);
-            row.createCell(1).setCellValue(42.0);   // numeric — getStringCellValue throws
-
-            assertThat(service.readLastUpdated(wb)).isNull();
-        }
     }
 
     // ---------------------------------------------------------------
@@ -295,26 +239,13 @@ class SpreadsheetImportServiceTest {
     // Helpers
     // ---------------------------------------------------------------
 
-    private SpreadsheetImportService serviceFor(Path spreadsheet) {
+    private SpreadsheetImportService serviceFor(Path spreadsheet, String version) {
         return new SpreadsheetImportService(
-                repository, thumbnailService, cacheService, spreadsheet.toString());
+                repository, thumbnailService, cacheService, spreadsheet.toString(), version);
     }
 
-    /** Writes a minimal .xlsx with the given last-updated timestamp in Metadata!B1. */
-    private Path writeWorkbook(Path dir, String timestamp) throws IOException {
-        Path file = dir.resolve("spreadsheet.xlsx");
-        try (var wb = new XSSFWorkbook()) {
-            var row = wb.createSheet("Metadata").createRow(0);
-            row.createCell(1).setCellValue(timestamp);
-            try (var out = Files.newOutputStream(file)) {
-                wb.write(out);
-            }
-        }
-        return file;
-    }
-
-    /** Writes a minimal .xlsx with no Metadata sheet, so the last-updated version is null. */
-    private Path writeWorkbookWithoutMetadata(Path dir) throws IOException {
+    /** Writes a minimal, otherwise-empty .xlsx. */
+    private Path writeEmptyWorkbook(Path dir) throws IOException {
         Path file = dir.resolve("spreadsheet.xlsx");
         try (var wb = new XSSFWorkbook()) {
             wb.createSheet("Data");
@@ -325,12 +256,10 @@ class SpreadsheetImportServiceTest {
         return file;
     }
 
-    /** Writes an .xlsx with a Metadata timestamp plus a sheet holding one embedded PNG. */
-    private Path writeWorkbookWithPicture(Path dir, String timestamp) throws IOException {
+    /** Writes an .xlsx with a sheet holding one embedded PNG. */
+    private Path writeWorkbookWithPicture(Path dir) throws IOException {
         Path file = dir.resolve("spreadsheet.xlsx");
         try (var wb = new XSSFWorkbook()) {
-            wb.createSheet("Metadata").createRow(0).createCell(1).setCellValue(timestamp);
-
             var sheet   = wb.createSheet("Images");
             int picIdx  = wb.addPicture(tinyPng(), Workbook.PICTURE_TYPE_PNG);
             var drawing = sheet.createDrawingPatriarch();

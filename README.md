@@ -68,7 +68,7 @@ Place these files in the same folder on the target PC:
 ```
 C:\ImageBrowser\
     image-browser-1.0.0.jar
-    spreadsheet.xlsx          ← source spreadsheet (see format below)
+    data\input\Archive_Index_Numbers_Current.xlsx   ← source spreadsheet (see format below)
     images.db                 ← created automatically on first run (also stores admin password hash)
     start.bat                 ← Windows startup script
 ```
@@ -152,7 +152,7 @@ All configuration is in `application.properties` (or override via environment va
 | Property | Default | Description |
 |---|---|---|
 | `server.port` | `7000` | HTTP port |
-| `app.spreadsheet.path` | `spreadsheet.xlsx` | Path to Excel file |
+| `app.spreadsheet.path` | `data/input/Archive_Index_Numbers_Current.xlsx` | Path to Excel file |
 | `app.thumbnail.max-px` | `128` | Thumbnail longest edge in pixels |
 | `app.thumbnail.jpeg-quality` | `0.75` | JPEG compression quality (0.0–1.0) |
 | `app.cache.thumbnail-max-bytes` | `15728640` | Thumbnail cache size (15MB) |

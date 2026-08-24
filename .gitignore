@@ -59,4 +59,5 @@ Thumbs.db
 # Claude Code
 .claude/
 
-.~lock.spreadsheet.xlsx#
+.~lock.Archive_Index_Numbers_Current.xlsx#
+/data/output/

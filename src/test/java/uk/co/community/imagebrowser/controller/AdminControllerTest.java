@@ -10,7 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import uk.co.community.imagebrowser.TestCacheConfig;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
-import uk.co.community.imagebrowser.service.SpreadsheetImportService;
+import uk.co.community.imagebrowser.service.OutputSyncService;
 
 import java.io.IOException;
 
@@ -28,9 +28,9 @@ class AdminControllerTest {
     @Autowired
     private MockMvc mvc;
 
-    @MockitoBean private AdminSessionManager    sessionManager;
-    @MockitoBean private AdminPasswordService   passwordService;
-    @MockitoBean private SpreadsheetImportService importService;
+    @MockitoBean private AdminSessionManager  sessionManager;
+    @MockitoBean private AdminPasswordService passwordService;
+    @MockitoBean private OutputSyncService    outputSyncService;
 
     @Test
     @DisplayName("GET /admin/login returns login page")
@@ -140,24 +140,21 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/reload when authorised triggers a force import and reports success")
-    void reload_WhenAuthorised_ShouldForceImportAndReturnSuccess() throws Exception {
+    @DisplayName("POST /admin/reload when authorised triggers an output sync and reports success")
+    void reload_WhenAuthorised_ShouldSyncOutputAndReturnSuccess() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
-        when(importService.forceImport()).thenReturn(
-                new SpreadsheetImportService.ImportResult(
-                        SpreadsheetImportService.ImportResult.Status.SUCCESS, 7, "v2",
-                        "7 images imported successfully."));
+        when(outputSyncService.sync()).thenReturn(7);
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
            .andExpect(status().isOk())
-           .andExpect(content().string(containsString("7 images imported")));
+           .andExpect(content().string(containsString("7 file(s) copied")));
     }
 
     @Test
-    @DisplayName("POST /admin/reload returns an error fragment when the import throws")
-    void reload_WhenImportThrows_ShouldReturnErrorFragment() throws Exception {
+    @DisplayName("POST /admin/reload returns an error fragment when the sync throws")
+    void reload_WhenSyncThrows_ShouldReturnErrorFragment() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
-        when(importService.forceImport()).thenThrow(new IOException("disk gone"));
+        when(outputSyncService.sync()).thenThrow(new IOException("disk gone"));
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
            .andExpect(status().isOk())

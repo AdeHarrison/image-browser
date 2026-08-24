@@ -18,11 +18,10 @@ import java.time.LocalDateTime;
  * Reads an Excel (.xlsx) file, extracts embedded images + thumbnails,
  * and persists them to SQLite.
  *
- * Checks a "last_updated" cell on the Metadata sheet before importing —
- * if the spreadsheet is unchanged since last import, the import is skipped.
- *
- * Metadata sheet layout (Sheet named "Metadata"):
- *   A1 — last updated timestamp string e.g. "2026-05-22T10:30:00"
+ * Checks a version string, configured via app.spreadsheet.version, before
+ * importing — if it matches what's already stored, the import is skipped.
+ * There is no longer any in-spreadsheet timestamp cell; the version is a
+ * plain config value that must be bumped manually to trigger a reimport.
  */
 @Service
 public class SpreadsheetImportService {
@@ -33,16 +32,20 @@ public class SpreadsheetImportService {
     private final ThumbnailService thumbnailService;
     private final ImageCacheService cacheService;
     private final Path             spreadsheetPath;
+    private final String           configuredVersion;
 
     public SpreadsheetImportService(
             ImageRepository  repository,
             ThumbnailService thumbnailService,
             ImageCacheService cacheService,
-            @Value("${app.spreadsheet.path:spreadsheet.xlsx}") String spreadsheetPath) {
+            @Value("${app.spreadsheet.path:data/input/Archive_Index_Numbers_Current.xlsx}") String spreadsheetPath,
+            @Value("${app.spreadsheet.version:}") String spreadsheetVersion) {
         this.repository      = repository;
         this.thumbnailService = thumbnailService;
         this.cacheService    = cacheService;
         this.spreadsheetPath = Path.of(spreadsheetPath);
+        this.configuredVersion = (spreadsheetVersion == null || spreadsheetVersion.isBlank())
+                ? null : spreadsheetVersion;
     }
 
     /**
@@ -60,35 +63,33 @@ public class SpreadsheetImportService {
         try (var fis      = Files.newInputStream(spreadsheetPath);
              var workbook = new XSSFWorkbook(fis)) {
 
-            String spreadsheetVersion = readLastUpdated(workbook);
-            String storedVersion      = repository.getConfig(AppConfig.LAST_UPDATED_KEY)
-                                                  .orElse(null);
+            String storedVersion = repository.getConfig(AppConfig.LAST_UPDATED_KEY)
+                                              .orElse(null);
 
-            // Database already exists
-            if (storedVersion != null) {
-                LocalDateTime dtSpreadsheetVersion = LocalDateTime.parse(spreadsheetVersion);
-                LocalDateTime dtStoredVersion = LocalDateTime.parse(storedVersion);
+            if (storedVersion != null && configuredVersion != null) {
+                LocalDateTime dtConfiguredVersion = LocalDateTime.parse(configuredVersion);
+                LocalDateTime dtStoredVersion     = LocalDateTime.parse(storedVersion);
 
-                if (!dtSpreadsheetVersion.isAfter(dtStoredVersion)) {
+                if (!dtConfiguredVersion.isAfter(dtStoredVersion)) {
                     log.info("Spreadsheet unchanged (version={}). Skipping import.", storedVersion);
-                    return ImportResult.skipped(spreadsheetVersion);
+                    return ImportResult.skipped(configuredVersion);
                 }
             }
 
             log.info("Spreadsheet changed ({} → {}). Starting full import.",
-                    storedVersion, spreadsheetVersion);
+                    storedVersion, configuredVersion);
 
             repository.clearAll();
             cacheService.invalidateAll();
 
             int imported = importImages(workbook);
 
-            if (spreadsheetVersion != null) {
-                repository.setConfig(AppConfig.LAST_UPDATED_KEY, spreadsheetVersion);
+            if (configuredVersion != null) {
+                repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
             }
 
             log.info("Import complete. {} images imported.", imported);
-            return ImportResult.success(imported, spreadsheetVersion);
+            return ImportResult.success(imported, configuredVersion);
         }
     }
 
@@ -102,15 +103,14 @@ public class SpreadsheetImportService {
         try (var fis      = Files.newInputStream(spreadsheetPath);
              var workbook = new XSSFWorkbook(fis)) {
 
-            String version = readLastUpdated(workbook);
             repository.clearAll();
             cacheService.invalidateAll();
             int imported = importImages(workbook);
-            if (version != null) {
-                repository.setConfig(AppConfig.LAST_UPDATED_KEY, version);
+            if (configuredVersion != null) {
+                repository.setConfig(AppConfig.LAST_UPDATED_KEY, configuredVersion);
             }
             log.info("Force import complete. {} images imported.", imported);
-            return ImportResult.success(imported, version);
+            return ImportResult.success(imported, configuredVersion);
         }
     }
 
@@ -168,20 +168,6 @@ public class SpreadsheetImportService {
             }
         }
         return count;
-    }
-
-    String readLastUpdated(XSSFWorkbook workbook) {
-        XSSFSheet meta = workbook.getSheet("Metadata");
-        if (meta == null) return null;
-        var row = meta.getRow(0);
-        if (row == null) return null;
-        var cell = row.getCell(1);
-        if (cell == null) return null;
-        try {
-            return cell.getStringCellValue();
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     // ---------------------------------------------------------------

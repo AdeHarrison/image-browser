@@ -9,7 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
-import uk.co.community.imagebrowser.service.SpreadsheetImportService;
+import uk.co.community.imagebrowser.service.OutputSyncService;
 
 @Controller
 @RequestMapping("/admin")
@@ -20,14 +20,14 @@ public class AdminController {
 
     private final AdminSessionManager    sessionManager;
     private final AdminPasswordService   passwordService;
-    private final SpreadsheetImportService importService;
+    private final OutputSyncService      outputSyncService;
 
     public AdminController(AdminSessionManager    sessionManager,
                            AdminPasswordService   passwordService,
-                           SpreadsheetImportService importService) {
-        this.sessionManager  = sessionManager;
-        this.passwordService = passwordService;
-        this.importService   = importService;
+                           OutputSyncService      outputSyncService) {
+        this.sessionManager    = sessionManager;
+        this.passwordService   = passwordService;
+        this.outputSyncService = outputSyncService;
     }
 
     // ---------------------------------------------------------------
@@ -83,6 +83,8 @@ public class AdminController {
     // Reload
     // ---------------------------------------------------------------
 
+    // Currently only rebuilds the output folder structure from the input
+    // spreadsheet/images (see OutputSyncService) — no DB import yet.
     @PostMapping("/reload")
     @ResponseBody
     public String reload(HttpServletRequest request) {
@@ -90,8 +92,8 @@ public class AdminController {
             return "<p class='error'>Not authorised.</p>";
         }
         try {
-            var result = importService.forceImport();
-            return "<p class='success'>✓ %s</p>".formatted(result.message());
+            int copied = outputSyncService.sync();
+            return "<p class='success'>✓ Output folder rebuilt: %d file(s) copied.</p>".formatted(copied);
         } catch (Exception e) {
             log.error("Admin reload failed: {}", e.getMessage(), e);
             return "<p class='error'>Reload failed: %s</p>".formatted(e.getMessage());

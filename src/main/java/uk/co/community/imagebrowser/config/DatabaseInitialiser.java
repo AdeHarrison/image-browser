@@ -28,17 +28,22 @@ public class DatabaseInitialiser {
 
     @PostConstruct
     public void initialise() {
-        log.info("Initialising database schema...");
-        repository.createSchema();
-        log.info("Schema ready.");
-
-        log.info("Checking spreadsheet for updates...");
-        try {
-            var result = importService.importIfUpdated();
-            log.info("Spreadsheet check: status={} message='{}'",
-                    result.status(), result.message());
-        } catch (Exception e) {
-            log.error("Spreadsheet import failed on startup: {}", e.getMessage(), e);
-        }
+        // DB-backed import is disabled for now — only the file-based output sync
+        // (OutputSyncService) runs currently, while the importer/schema rework for
+        // the new spreadsheet format is in progress. Re-enable once that's ready.
+        //
+        // log.info("Initialising database schema...");
+        // repository.createSchema();
+        // log.info("Schema ready.");
+        //
+        // log.info("Checking spreadsheet for updates...");
+        // try {
+        //     var result = importService.importIfUpdated();
+        //     log.info("Spreadsheet check: status={} message='{}'",
+        //             result.status(), result.message());
+        // } catch (Exception e) {
+        //     log.error("Spreadsheet import failed on startup: {}", e.getMessage(), e);
+        // }
+        log.info("Database initialisation skipped for now (DB-backed import disabled).");
     }
 }

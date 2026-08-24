@@ -14,6 +14,8 @@ import java.nio.file.Path;
 /**
  * Confirms on startup that the spreadsheet configured via app.spreadsheet.path
  * actually exists at that location, and that it contains an "AVIATION" sheet.
+ * Any failed check throws, which fails application startup — this is a hard
+ * requirement, not an advisory warning.
  */
 @Component
 public class SpreadsheetAvailabilityCheck {
@@ -25,33 +27,30 @@ public class SpreadsheetAvailabilityCheck {
     private final Path spreadsheetPath;
 
     public SpreadsheetAvailabilityCheck(
-            @Value("${app.spreadsheet.path:spreadsheet.xlsx}") String spreadsheetPath) {
+            @Value("${app.spreadsheet.path:data/input/Archive_Index_Numbers_Current.xlsx}") String spreadsheetPath) {
         this.spreadsheetPath = Path.of(spreadsheetPath);
     }
 
     @PostConstruct
     void checkAvailability() {
-        if (!checkFileExists()) {
-            return;
-        }
+        checkFileExists();
         checkAviationSheetExists();
     }
 
-    private boolean checkFileExists() {
+    private void checkFileExists() {
         Path resolved = spreadsheetPath.toAbsolutePath().normalize();
 
         if (!Files.exists(spreadsheetPath)) {
-            log.warn("Spreadsheet NOT found at app.spreadsheet.path: {}", resolved);
-            return false;
+            throw new IllegalStateException(
+                    "Spreadsheet NOT found at app.spreadsheet.path: " + resolved);
         }
 
         try {
             long sizeBytes = Files.size(spreadsheetPath);
             log.info("Spreadsheet found at app.spreadsheet.path: {} ({} bytes)", resolved, sizeBytes);
-            return true;
         } catch (IOException e) {
-            log.warn("Spreadsheet found at {} but could not be read: {}", resolved, e.getMessage());
-            return false;
+            throw new IllegalStateException(
+                    "Spreadsheet found at %s but could not be read: %s".formatted(resolved, e.getMessage()), e);
         }
     }
 
@@ -59,14 +58,15 @@ public class SpreadsheetAvailabilityCheck {
         try (var fis = Files.newInputStream(spreadsheetPath);
              var workbook = new XSSFWorkbook(fis)) {
 
-            if (workbook.getSheet(AVIATION_SHEET_NAME) != null) {
-                log.info("'{}' sheet found in spreadsheet.", AVIATION_SHEET_NAME);
-            } else {
-                log.warn("'{}' sheet NOT found in spreadsheet.", AVIATION_SHEET_NAME);
+            if (workbook.getSheet(AVIATION_SHEET_NAME) == null) {
+                throw new IllegalStateException(
+                        "'%s' sheet NOT found in spreadsheet: %s".formatted(AVIATION_SHEET_NAME, spreadsheetPath));
             }
+            log.info("'{}' sheet found in spreadsheet.", AVIATION_SHEET_NAME);
         } catch (IOException e) {
-            log.warn("Could not open spreadsheet to check for '{}' sheet: {}",
-                    AVIATION_SHEET_NAME, e.getMessage());
+            throw new IllegalStateException(
+                    "Could not open spreadsheet to check for '%s' sheet: %s"
+                            .formatted(AVIATION_SHEET_NAME, e.getMessage()), e);
         }
     }
 }
