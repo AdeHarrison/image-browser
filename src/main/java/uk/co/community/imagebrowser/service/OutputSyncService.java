@@ -1,6 +1,5 @@
 package uk.co.community.imagebrowser.service;
 
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,8 +19,8 @@ import java.util.Comparator;
  *     with a "FULL-" filename prefix
  *
  * No thumbnails, no DB writes — filesystem sync only. This is a first step
- * towards the new file-based importer; it runs on startup so it can be
- * verified directly against the data/input directory.
+ * towards the new file-based importer. Only runs when triggered from the
+ * admin "reload" action (AdminController) — NOT automatically on startup.
  */
 @Service
 public class OutputSyncService {
@@ -38,11 +37,6 @@ public class OutputSyncService {
             @Value("${app.data.output-dir:data/output}") String outputDir) {
         this.inputDir  = Path.of(spreadsheetPath).toAbsolutePath().normalize().getParent();
         this.outputDir = Path.of(outputDir);
-    }
-
-    @PostConstruct
-    void onStartup() throws IOException {
-        sync();
     }
 
     /**
