@@ -105,6 +105,15 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- DevTools: auto-restart on classpath change + LiveReload, so template/static edits
+             (and recompiled classes) are picked up by the running app without a manual restart.
+             optional=true keeps it out of the fat JAR. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

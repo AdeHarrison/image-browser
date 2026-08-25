@@ -4,6 +4,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import uk.co.community.imagebrowser.model.AviationImageRecord;
+import uk.co.community.imagebrowser.model.AviationImageSummary;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * PostgreSQL-backed store for images imported from the AVIATION sheet.
@@ -11,6 +17,9 @@ import uk.co.community.imagebrowser.model.AviationImageRecord;
  */
 @Repository
 public class AviationImageRepository {
+
+    private static final String SUMMARY_SELECT =
+            "SELECT id, category, folder, file_name, description FROM images";
 
     private final JdbcTemplate jdbc;
 
@@ -43,5 +52,51 @@ public class AviationImageRepository {
             INSERT INTO images (category, description, folder, file_name)
             VALUES (?, ?, ?, ?)
         """, rec.category(), rec.description(), rec.folder(), rec.fileName());
+    }
+
+    // ---------------------------------------------------------------
+    // Search
+    // ---------------------------------------------------------------
+
+    /**
+     * Partial, case-insensitive match against description; a blank term
+     * returns every row.
+     */
+    public List<AviationImageSummary> search(String term) {
+        if (term == null || term.isBlank()) {
+            return findAll();
+        }
+        return jdbc.query(SUMMARY_SELECT + " WHERE description ILIKE ? ORDER BY id",
+                this::mapSummary, "%" + escapeLike(term.trim()) + "%");
+    }
+
+    public List<AviationImageSummary> findAll() {
+        return jdbc.query(SUMMARY_SELECT + " ORDER BY id", this::mapSummary);
+    }
+
+    public Optional<AviationImageSummary> findById(long id) {
+        return jdbc.query(SUMMARY_SELECT + " WHERE id = ?", this::mapSummary, id)
+                .stream().findFirst();
+    }
+
+    public long count() {
+        Long result = jdbc.queryForObject("SELECT COUNT(*) FROM images", Long.class);
+        return result != null ? result : 0L;
+    }
+
+    private AviationImageSummary mapSummary(ResultSet rs, int rowNum) throws SQLException {
+        return new AviationImageSummary(
+                rs.getLong("id"),
+                rs.getString("category"),
+                rs.getString("folder"),
+                rs.getString("file_name"),
+                rs.getString("description"));
+    }
+
+    /** Escapes ILIKE wildcards so user input is matched literally. */
+    private String escapeLike(String term) {
+        return term.replace("\\", "\\\\")
+                   .replace("%", "\\%")
+                   .replace("_", "\\_");
     }
 }
