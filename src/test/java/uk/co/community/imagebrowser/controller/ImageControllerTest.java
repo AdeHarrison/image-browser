@@ -97,7 +97,7 @@ class ImageControllerTest {
                 new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "Mr Hucks publicity photograph"));
         when(imageService.browsePageSize()).thenReturn(60);
         when(imageService.count()).thenReturn(1L);
-        when(imageService.browse(0)).thenReturn(results);
+        when(imageService.browse(0, 60)).thenReturn(results);
 
         mvc.perform(get("/browse").param("page", "0"))
            .andExpect(status().isOk())
@@ -114,13 +114,25 @@ class ImageControllerTest {
     void browse_WhenPageOutOfRange_ShouldClampToLastPage() throws Exception {
         when(imageService.browsePageSize()).thenReturn(60);
         when(imageService.count()).thenReturn(120L);
-        when(imageService.browse(1)).thenReturn(List.of(
+        when(imageService.browse(1, 60)).thenReturn(List.of(
                 new AviationImageSummary(61L, "AVIATION", "5", "1.jpg", "desc")));
 
         mvc.perform(get("/browse").param("page", "99"))
            .andExpect(status().isOk())
            .andExpect(content().string(containsString("/thumbnail/61")))
            .andExpect(content().string(containsString("Page 2 of 2")));
+    }
+
+    @Test
+    @DisplayName("GET /browse uses a client-supplied size, clamped to the sane maximum")
+    void browse_WhenSizeGiven_ShouldUseClampedSize() throws Exception {
+        when(imageService.count()).thenReturn(1000L);
+        when(imageService.browse(0, 300)).thenReturn(List.of(
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "desc")));
+
+        mvc.perform(get("/browse").param("page", "0").param("size", "5000"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("/thumbnail/1")));
     }
 
     @Test

@@ -17,6 +17,10 @@ public class ImageController {
 
     private static final String CACHE_HEADER = "public, max-age=86400";
 
+    // Sanity cap on the client-supplied browse page size (fits-the-screen calc), so a
+    // crafted request can't force an enormous single-page query.
+    private static final int MAX_BROWSE_PAGE_SIZE = 300;
+
     private final AviationImageService imageService;
 
     public ImageController(AviationImageService imageService) {
@@ -60,19 +64,27 @@ public class ImageController {
 
     @GetMapping("/browse")
     @ResponseBody
-    public String browse(@RequestParam(defaultValue = "0") int page) {
-        int  pageSize = imageService.browsePageSize();
+    public String browse(@RequestParam(defaultValue = "0") int page,
+                          @RequestParam(required = false) Integer size) {
+        int  pageSize = clampPageSize(size);
         long total    = imageService.count();
         int  lastPage = total == 0 ? 0 : (int) ((total - 1) / pageSize);
 
         page = Math.max(0, Math.min(page, lastPage));
 
-        List<AviationImageSummary> results = imageService.browse(page);
+        List<AviationImageSummary> results = imageService.browse(page, pageSize);
         String grid = results.isEmpty()
                 ? "<p class='no-results'>No images found.</p>"
                 : renderCards(results);
 
         return grid + renderBrowseNav(page, lastPage);
+    }
+
+    private int clampPageSize(Integer requested) {
+        if (requested == null) {
+            return imageService.browsePageSize();
+        }
+        return Math.max(1, Math.min(requested, MAX_BROWSE_PAGE_SIZE));
     }
 
     // ---------------------------------------------------------------
@@ -84,14 +96,15 @@ public class ImageController {
         for (AviationImageSummary r : results) {
             String description = escapeHtml(r.description());
             sb.append("""
-                <div class="card" data-id="%d" data-description="%s">
+                <div class="card" data-id="%d" data-description="%s"
+                     tabindex="0" role="button" aria-label="%s">
                     <img src="/thumbnail/%d"
                          alt="%s"
                          loading="lazy"
                          width="128" height="128">
                     <span class="card-sheet">Folder: %s</span>
                 </div>
-            """.formatted(r.id(), description, r.id(), description, escapeHtml(r.folder())));
+            """.formatted(r.id(), description, description, r.id(), description, escapeHtml(r.folder())));
         }
         return sb.toString();
     }

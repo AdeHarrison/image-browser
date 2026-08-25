@@ -64,15 +64,51 @@
 <script>
     var searchInput = document.getElementById('search-input');
 
+    // How many thumbnails fit on screen without vertical scrolling, leaving room
+    // for the first/previous/next/last bar below the grid.
+    function computeBrowsePageSize() {
+        var grid = document.getElementById('grid');
+        var nav  = document.getElementById('browse-nav');
+        var gap  = 10; // matches .image-grid's gap
+
+        var sample   = grid.querySelector('.card');
+        var cardBox  = sample ? sample.getBoundingClientRect() : { width: 152, height: 184 };
+
+        var availableWidth  = grid.clientWidth;
+        var availableHeight = window.innerHeight - grid.getBoundingClientRect().top
+                - (nav.offsetHeight || 90) - 16;
+
+        var columns = Math.max(1, Math.floor(availableWidth  / (cardBox.width  + gap)));
+        var rows    = Math.max(1, Math.floor(availableHeight / (cardBox.height + gap)));
+
+        return columns * rows;
+    }
+
     // "*" is a request to browse every image instead of searching by text —
-    // reroute the debounced htmx request from /search to /browse.
+    // reroute the debounced htmx request from /search to /browse, sized to fill
+    // the visible area without a vertical scrollbar.
     document.body.addEventListener('htmx:configRequest', function (evt) {
         if (evt.detail.elt === searchInput && searchInput.value === '*') {
             evt.detail.path = '/browse';
             delete evt.detail.parameters.q;
             evt.detail.parameters.page = 0;
         }
+        if (evt.detail.path.indexOf('/browse') === 0) {
+            evt.detail.parameters.size = computeBrowsePageSize();
+        }
     });
+
+    // Re-fill the screen if the window is resized while browsing all images.
+    (function () {
+        var resizeTimer = null;
+        window.addEventListener('resize', function () {
+            if (searchInput.value !== '*') return;
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () {
+                htmx.trigger(searchInput, 'search');
+            }, 250);
+        });
+    })();
 
     // Guard against a stale in-flight /search or /browse response swapping in
     // after the user has since deleted back below 3 chars (and isn't browsing all).
@@ -210,6 +246,17 @@
         grid.addEventListener('click', function (evt) {
             var card = evt.target.closest('.card[data-id]');
             if (card) openViewer(card);
+        });
+
+        // Tab / Shift-Tab between thumbnails is native browser behavior once cards
+        // are focusable (tabindex="0", set server-side); Enter opens the focused one.
+        grid.addEventListener('keydown', function (evt) {
+            if (evt.key !== 'Enter') return;
+            var card = evt.target.closest('.card[data-id]');
+            if (card) {
+                evt.preventDefault();
+                openViewer(card);
+            }
         });
 
         backdrop.addEventListener('click', function (evt) {

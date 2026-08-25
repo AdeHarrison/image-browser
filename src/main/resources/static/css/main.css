@@ -75,7 +75,7 @@ main { padding: 1.2rem 1.5rem; max-width: 1400px; margin: 0 auto; }
     padding: 6px;
     width: 148px;
     cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
     text-align: center;
 }
 
@@ -84,9 +84,17 @@ main { padding: 1.2rem 1.5rem; max-width: 1400px; margin: 0 auto; }
     box-shadow: 0 2px 8px rgba(0,102,204,0.2);
 }
 
+.card:focus-visible {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0,102,204,0.4);
+}
+
 .card.active {
     border-color: #0066cc;
-    box-shadow: 0 0 0 3px rgba(0,102,204,0.35);
+    background: #eaf3fe;
+    box-shadow: 0 0 0 4px rgba(0,102,204,0.55), 0 4px 14px rgba(0,102,204,0.35);
+    transform: scale(1.05);
 }
 
 .card img {
@@ -300,6 +308,18 @@ main { padding: 1.2rem 1.5rem; max-width: 1400px; margin: 0 auto; }
     text-align: center;
     font-size: 0.8rem;
     color: #888;
+}
+
+#modal-description {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    background: #f2f6fc;
+    border-left: 4px solid #0066cc;
+    border-radius: 4px;
+    padding: 0.7rem 1rem;
+    margin-bottom: 1rem;
 }
 
 /* ===== Error / success messages ===== */

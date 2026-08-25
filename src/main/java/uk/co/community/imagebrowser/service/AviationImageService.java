@@ -55,8 +55,8 @@ public class AviationImageService {
     }
 
     /** One page (0-indexed) of every image, ordered by id, for the "browse all" (*) view. */
-    public List<AviationImageSummary> browse(int page) {
-        return repository.findPage(page * browsePageSize, browsePageSize);
+    public List<AviationImageSummary> browse(int page, int pageSize) {
+        return repository.findPage(page * pageSize, pageSize);
     }
 
     public Optional<AviationImageSummary> findById(long id) {
