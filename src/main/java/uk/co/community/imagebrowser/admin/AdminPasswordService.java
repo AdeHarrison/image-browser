@@ -36,16 +36,21 @@ public class AdminPasswordService {
         this.repository = repository;
     }
 
+    // TEMPORARY: this used ImageRepository (SQLite schema — AUTOINCREMENT, FTS5)
+    // which is incompatible with the PostgreSQL datasource now configured in
+    // application.properties, and admin auth is already bypassed for testing
+    // (see AdminController.isAdmin()). Disabled to avoid a startup crash;
+    // restore alongside re-enabling the SQLite datasource / real auth.
     @PostConstruct
     public void load() {
-        repository.createSchema();
-
-        passwordHash = repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)
-                .orElseGet(() -> {
-                    log.warn("No admin password set. Seeding default password — change it before deploying.");
-                    repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, DEFAULT_PASSWORD_HASH);
-                    return DEFAULT_PASSWORD_HASH;
-                });
+        // repository.createSchema();
+        //
+        // passwordHash = repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)
+        //         .orElseGet(() -> {
+        //             log.warn("No admin password set. Seeding default password — change it before deploying.");
+        //             repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, DEFAULT_PASSWORD_HASH);
+        //             return DEFAULT_PASSWORD_HASH;
+        //         });
     }
 
     public boolean verify(String candidate) {

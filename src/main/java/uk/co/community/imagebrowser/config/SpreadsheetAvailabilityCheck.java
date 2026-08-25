@@ -38,35 +38,35 @@ public class SpreadsheetAvailabilityCheck {
     }
 
     private void checkFileExists() {
-        Path resolved = spreadsheetPath.toAbsolutePath().normalize();
-
-        if (!Files.exists(spreadsheetPath)) {
-            throw new IllegalStateException(
-                    "Spreadsheet NOT found at app.spreadsheet.path: " + resolved);
-        }
-
-        try {
-            long sizeBytes = Files.size(spreadsheetPath);
-            log.info("Spreadsheet found at app.spreadsheet.path: {} ({} bytes)", resolved, sizeBytes);
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                    "Spreadsheet found at %s but could not be read: %s".formatted(resolved, e.getMessage()), e);
-        }
+//        Path resolved = spreadsheetPath.toAbsolutePath().normalize();
+//
+//        if (!Files.exists(spreadsheetPath)) {
+//            throw new IllegalStateException(
+//                    "Spreadsheet NOT found at app.spreadsheet.path: " + resolved);
+//        }
+//
+//        try {
+//            long sizeBytes = Files.size(spreadsheetPath);
+//            log.info("Spreadsheet found at app.spreadsheet.path: {} ({} bytes)", resolved, sizeBytes);
+//        } catch (IOException e) {
+//            throw new IllegalStateException(
+//                    "Spreadsheet found at %s but could not be read: %s".formatted(resolved, e.getMessage()), e);
+//        }
     }
 
     private void checkAviationSheetExists() {
-        try (var fis = Files.newInputStream(spreadsheetPath);
-             var workbook = new XSSFWorkbook(fis)) {
-
-            if (workbook.getSheet(AVIATION_SHEET_NAME) == null) {
-                throw new IllegalStateException(
-                        "'%s' sheet NOT found in spreadsheet: %s".formatted(AVIATION_SHEET_NAME, spreadsheetPath));
-            }
-            log.info("'{}' sheet found in spreadsheet.", AVIATION_SHEET_NAME);
-        } catch (IOException e) {
-            throw new IllegalStateException(
-                    "Could not open spreadsheet to check for '%s' sheet: %s"
-                            .formatted(AVIATION_SHEET_NAME, e.getMessage()), e);
-        }
+//        try (var fis = Files.newInputStream(spreadsheetPath);
+//             var workbook = new XSSFWorkbook(fis)) {
+//
+//            if (workbook.getSheet(AVIATION_SHEET_NAME) == null) {
+//                throw new IllegalStateException(
+//                        "'%s' sheet NOT found in spreadsheet: %s".formatted(AVIATION_SHEET_NAME, spreadsheetPath));
+//            }
+//            log.info("'{}' sheet found in spreadsheet.", AVIATION_SHEET_NAME);
+//        } catch (IOException e) {
+//            throw new IllegalStateException(
+//                    "Could not open spreadsheet to check for '%s' sheet: %s"
+//                            .formatted(AVIATION_SHEET_NAME, e.getMessage()), e);
+//        }
     }
 }

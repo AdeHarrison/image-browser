@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
+import uk.co.community.imagebrowser.service.AviationImportService;
 import uk.co.community.imagebrowser.service.OutputSyncService;
 
 @Controller
@@ -21,13 +22,16 @@ public class AdminController {
     private final AdminSessionManager    sessionManager;
     private final AdminPasswordService   passwordService;
     private final OutputSyncService      outputSyncService;
+    private final AviationImportService  aviationImportService;
 
     public AdminController(AdminSessionManager    sessionManager,
                            AdminPasswordService   passwordService,
-                           OutputSyncService      outputSyncService) {
+                           OutputSyncService      outputSyncService,
+                           AviationImportService  aviationImportService) {
         this.sessionManager    = sessionManager;
         this.passwordService   = passwordService;
         this.outputSyncService = outputSyncService;
+        this.aviationImportService = aviationImportService;
     }
 
     // ---------------------------------------------------------------
@@ -83,8 +87,9 @@ public class AdminController {
     // Reload
     // ---------------------------------------------------------------
 
-    // Currently only rebuilds the output folder structure from the input
-    // spreadsheet/images (see OutputSyncService) — no DB import yet.
+    // Rebuilds the output folder structure from the input spreadsheet/images
+    // (OutputSyncService), then reimports the AVIATION sheet into PostgreSQL
+    // (AviationImportService).
     @PostMapping("/reload")
     @ResponseBody
     public String reload(HttpServletRequest request) {
@@ -92,8 +97,10 @@ public class AdminController {
             return "<p class='error'>Not authorised.</p>";
         }
         try {
-            int copied = outputSyncService.sync();
-            return "<p class='success'>✓ Output folder rebuilt: %d file(s) copied.</p>".formatted(copied);
+            int copied   = outputSyncService.sync();
+            int imported = aviationImportService.reimport();
+            return "<p class='success'>✓ Output folder rebuilt: %d file(s) copied. %d record(s) imported.</p>"
+                    .formatted(copied, imported);
         } catch (Exception e) {
             log.error("Admin reload failed: {}", e.getMessage(), e);
             return "<p class='error'>Reload failed: %s</p>".formatted(e.getMessage());

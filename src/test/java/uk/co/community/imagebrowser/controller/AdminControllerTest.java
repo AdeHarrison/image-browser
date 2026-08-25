@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import uk.co.community.imagebrowser.TestCacheConfig;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
+import uk.co.community.imagebrowser.service.AviationImportService;
 import uk.co.community.imagebrowser.service.OutputSyncService;
 
 import java.io.IOException;
@@ -29,9 +30,10 @@ class AdminControllerTest {
     @Autowired
     private MockMvc mvc;
 
-    @MockitoBean private AdminSessionManager  sessionManager;
-    @MockitoBean private AdminPasswordService passwordService;
-    @MockitoBean private OutputSyncService    outputSyncService;
+    @MockitoBean private AdminSessionManager   sessionManager;
+    @MockitoBean private AdminPasswordService  passwordService;
+    @MockitoBean private OutputSyncService     outputSyncService;
+    @MockitoBean private AviationImportService aviationImportService;
 
     @Test
     @Disabled("admin auth is temporarily disabled for testing — see AdminController.isAdmin()")
@@ -146,21 +148,35 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/reload when authorised triggers an output sync and reports success")
-    void reload_WhenAuthorised_ShouldSyncOutputAndReturnSuccess() throws Exception {
+    @DisplayName("POST /admin/reload when authorised syncs output and reimports AVIATION, reporting success")
+    void reload_WhenAuthorised_ShouldSyncOutputAndReimportAndReturnSuccess() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
         when(outputSyncService.sync()).thenReturn(7);
+        when(aviationImportService.reimport()).thenReturn(12);
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
            .andExpect(status().isOk())
-           .andExpect(content().string(containsString("7 file(s) copied")));
+           .andExpect(content().string(containsString("7 file(s) copied")))
+           .andExpect(content().string(containsString("12 record(s) imported")));
     }
 
     @Test
-    @DisplayName("POST /admin/reload returns an error fragment when the sync throws")
+    @DisplayName("POST /admin/reload returns an error fragment when the output sync throws")
     void reload_WhenSyncThrows_ShouldReturnErrorFragment() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
         when(outputSyncService.sync()).thenThrow(new IOException("disk gone"));
+
+        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Reload failed")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/reload returns an error fragment when the AVIATION reimport throws")
+    void reload_WhenReimportThrows_ShouldReturnErrorFragment() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(outputSyncService.sync()).thenReturn(7);
+        when(aviationImportService.reimport()).thenThrow(new IOException("db gone"));
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
            .andExpect(status().isOk())
