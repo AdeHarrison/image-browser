@@ -11,10 +11,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import uk.co.community.imagebrowser.TestCacheConfig;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
-import uk.co.community.imagebrowser.service.AviationImportService;
-import uk.co.community.imagebrowser.service.OutputSyncService;
-
-import java.io.IOException;
+import uk.co.community.imagebrowser.service.AdminReloadService;
+import uk.co.community.imagebrowser.service.ImportProgressService;
+import uk.co.community.imagebrowser.service.ImportProgressService.Snapshot;
+import uk.co.community.imagebrowser.service.ImportProgressService.Status;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,8 +32,8 @@ class AdminControllerTest {
 
     @MockitoBean private AdminSessionManager   sessionManager;
     @MockitoBean private AdminPasswordService  passwordService;
-    @MockitoBean private OutputSyncService     outputSyncService;
-    @MockitoBean private AviationImportService aviationImportService;
+    @MockitoBean private AdminReloadService    reloadService;
+    @MockitoBean private ImportProgressService progressService;
 
     @Test
     @Disabled("admin auth is temporarily disabled for testing — see AdminController.isAdmin()")
@@ -148,38 +148,67 @@ class AdminControllerTest {
     }
 
     @Test
-    @DisplayName("POST /admin/reload when authorised syncs output and reimports AVIATION, reporting success")
-    void reload_WhenAuthorised_ShouldSyncOutputAndReimportAndReturnSuccess() throws Exception {
+    @DisplayName("POST /admin/reload when authorised starts a background reload and returns a running progress fragment")
+    void reload_WhenAuthorised_ShouldStartReloadAndReturnProgressFragment() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
-        when(outputSyncService.sync()).thenReturn(7);
-        when(aviationImportService.reimport()).thenReturn(12);
+        when(progressService.tryStart()).thenReturn(true);
+        when(progressService.snapshot()).thenReturn(new Snapshot(Status.RUNNING, "Starting...", 0, ""));
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("reload-progress")))
+           .andExpect(content().string(containsString("Starting...")))
+           .andExpect(content().string(containsString("/admin/reload/progress")));
+
+        verify(reloadService).runReload();
+    }
+
+    @Test
+    @DisplayName("POST /admin/reload when a reload is already running returns an error and does not start another")
+    void reload_WhenAlreadyRunning_ShouldReturnErrorAndNotStartAnother() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(progressService.tryStart()).thenReturn(false);
+
+        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("already in progress")));
+
+        verifyNoInteractions(reloadService);
+    }
+
+    @Test
+    @DisplayName("GET /admin/reload/progress while running returns a progress fragment with the current percentage")
+    void reloadProgress_WhenRunning_ShouldReturnProgressFragment() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(progressService.snapshot()).thenReturn(new Snapshot(Status.RUNNING, "Importing records...", 40, ""));
+
+        mvc.perform(get("/admin/reload/progress").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Importing records...")))
+           .andExpect(content().string(containsString("40%")));
+    }
+
+    @Test
+    @DisplayName("GET /admin/reload/progress once finished returns a success fragment")
+    void reloadProgress_WhenSucceeded_ShouldReturnSuccessFragment() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(progressService.snapshot()).thenReturn(new Snapshot(Status.SUCCESS, "", 100, "7 image(s) copied."));
+
+        mvc.perform(get("/admin/reload/progress").sessionAttr("admin", true))
            .andExpect(status().isOk())
            .andExpect(content().string(containsString("7 image(s) copied")));
     }
 
     @Test
-    @DisplayName("POST /admin/reload returns an error fragment when the output sync throws")
-    void reload_WhenSyncThrows_ShouldReturnErrorFragment() throws Exception {
+    @DisplayName("GET /admin/reload/progress once failed returns an error fragment")
+    void reloadProgress_WhenFailed_ShouldReturnErrorFragment() throws Exception {
         when(sessionManager.isActiveSession(any())).thenReturn(true);
-        when(outputSyncService.sync()).thenThrow(new IOException("disk gone"));
+        when(progressService.snapshot()).thenReturn(new Snapshot(Status.ERROR, "", 0, "disk gone"));
 
-        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
+        mvc.perform(get("/admin/reload/progress").sessionAttr("admin", true))
            .andExpect(status().isOk())
-           .andExpect(content().string(containsString("Reload failed")));
-    }
-
-    @Test
-    @DisplayName("POST /admin/reload returns an error fragment when the AVIATION reimport throws")
-    void reload_WhenReimportThrows_ShouldReturnErrorFragment() throws Exception {
-        when(sessionManager.isActiveSession(any())).thenReturn(true);
-        when(outputSyncService.sync()).thenReturn(7);
-        when(aviationImportService.reimport()).thenThrow(new IOException("db gone"));
-
-        mvc.perform(post("/admin/reload").sessionAttr("admin", true))
-           .andExpect(status().isOk())
-           .andExpect(content().string(containsString("Reload failed")));
+           .andExpect(content().string(containsString("Reload failed")))
+           .andExpect(content().string(containsString("disk gone")));
     }
 
     @Test

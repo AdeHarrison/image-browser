@@ -25,10 +25,12 @@ class AviationImportServiceTest {
 
     @Mock private AviationImageRepository repository;
 
+    private final ImportProgressService progressService = new ImportProgressService();
+
     @Test
     @DisplayName("reimport returns 0 and does not touch the repository when the spreadsheet is missing")
     void reimport_WhenSpreadsheetMissing_ShouldReturnZero() throws IOException {
-        var service = new AviationImportService(repository, "nonexistent-spreadsheet.xlsx");
+        var service = new AviationImportService(repository, "nonexistent-spreadsheet.xlsx", progressService);
 
         int imported = service.reimport();
 
@@ -47,7 +49,7 @@ class AviationImportServiceTest {
             }
         }
 
-        int imported = new AviationImportService(repository, file.toString()).reimport();
+        int imported = new AviationImportService(repository, file.toString(), progressService).reimport();
 
         assertThat(imported).isZero();
         verifyNoInteractions(repository);
@@ -58,7 +60,7 @@ class AviationImportServiceTest {
     void reimport_WithMixedRows_ShouldImportOnlyValidRowsWithCombinedDescription(@TempDir Path dir) throws IOException {
         Path file = writeAviationWorkbook(dir);
 
-        int imported = new AviationImportService(repository, file.toString()).reimport();
+        int imported = new AviationImportService(repository, file.toString(), progressService).reimport();
 
         assertThat(imported).isEqualTo(2);
         verify(repository).resetSchema();

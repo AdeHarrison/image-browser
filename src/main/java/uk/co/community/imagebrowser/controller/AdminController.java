@@ -9,8 +9,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
-import uk.co.community.imagebrowser.service.AviationImportService;
-import uk.co.community.imagebrowser.service.OutputSyncService;
+import uk.co.community.imagebrowser.service.AdminReloadService;
+import uk.co.community.imagebrowser.service.ImportProgressService;
 
 @Controller
 @RequestMapping("/admin")
@@ -19,19 +19,22 @@ public class AdminController {
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
     private static final String ADMIN_ATTR = "admin";
 
+    // How often the UI polls /admin/reload/progress while a reload is running.
+    private static final int PROGRESS_POLL_DELAY_MS = 600;
+
     private final AdminSessionManager    sessionManager;
     private final AdminPasswordService   passwordService;
-    private final OutputSyncService      outputSyncService;
-    private final AviationImportService  aviationImportService;
+    private final AdminReloadService     reloadService;
+    private final ImportProgressService  progressService;
 
     public AdminController(AdminSessionManager    sessionManager,
                            AdminPasswordService   passwordService,
-                           OutputSyncService      outputSyncService,
-                           AviationImportService  aviationImportService) {
+                           AdminReloadService     reloadService,
+                           ImportProgressService  progressService) {
         this.sessionManager    = sessionManager;
         this.passwordService   = passwordService;
-        this.outputSyncService = outputSyncService;
-        this.aviationImportService = aviationImportService;
+        this.reloadService     = reloadService;
+        this.progressService   = progressService;
     }
 
     // ---------------------------------------------------------------
@@ -89,21 +92,53 @@ public class AdminController {
 
     // Rebuilds the output folder structure from the input spreadsheet/images
     // (OutputSyncService), then reimports the AVIATION sheet into PostgreSQL
-    // (AviationImportService).
+    // (AviationImportService). Runs on a background thread (AdminReloadService)
+    // so this request returns immediately with a progress bar that polls
+    // /admin/reload/progress until the reload finishes.
     @PostMapping("/reload")
     @ResponseBody
     public String reload(HttpServletRequest request) {
         if (!isAdmin(request)) {
             return "<p class='error'>Not authorised.</p>";
         }
-        try {
-            int copied   = outputSyncService.sync();
-            aviationImportService.reimport();
-            return "<p class='success'>✓ %d image(s) copied.</p>".formatted(copied);
-        } catch (Exception e) {
-            log.error("Admin reload failed: {}", e.getMessage(), e);
-            return "<p class='error'>Reload failed: %s</p>".formatted(e.getMessage());
+        if (!progressService.tryStart()) {
+            return "<p class='error'>A reload is already in progress.</p>";
         }
+        reloadService.runReload();
+        return renderProgress(progressService.snapshot());
+    }
+
+    @GetMapping("/reload/progress")
+    @ResponseBody
+    public String reloadProgress(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return "<p class='error'>Not authorised.</p>";
+        }
+        return renderProgress(progressService.snapshot());
+    }
+
+    private String renderProgress(ImportProgressService.Snapshot snap) {
+        return switch (snap.status()) {
+            case RUNNING -> """
+                <div class="reload-progress" hx-get="/admin/reload/progress"
+                     hx-trigger="load delay:%dms" hx-swap="outerHTML">
+                    <p class="progress-stage">%s</p>
+                    <div class="progress-bar"><div class="progress-bar-fill" style="width:%d%%"></div></div>
+                    <p class="progress-percent">%d%%</p>
+                </div>
+                """.formatted(PROGRESS_POLL_DELAY_MS, escapeHtml(snap.stage()), snap.percent(), snap.percent());
+            case SUCCESS -> "<p class='success'>✓ %s</p>".formatted(escapeHtml(snap.message()));
+            case ERROR   -> "<p class='error'>Reload failed: %s</p>".formatted(escapeHtml(snap.message()));
+            case IDLE    -> "";
+        };
+    }
+
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     // ---------------------------------------------------------------

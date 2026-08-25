@@ -40,12 +40,15 @@ public class AviationImportService {
 
     private final AviationImageRepository repository;
     private final Path                    spreadsheetPath;
+    private final ImportProgressService   progressService;
 
     public AviationImportService(
             AviationImageRepository repository,
-            @Value("${app.spreadsheet.path:data/input/Archive_Index_Numbers_Current.xlsx}") String spreadsheetPath) {
+            @Value("${app.spreadsheet.path:data/input/Archive_Index_Numbers_Current.xlsx}") String spreadsheetPath,
+            ImportProgressService progressService) {
         this.repository      = repository;
         this.spreadsheetPath = Path.of(spreadsheetPath);
+        this.progressService = progressService;
     }
 
     /**
@@ -72,8 +75,12 @@ public class AviationImportService {
 
             repository.resetSchema();
 
+            int lastRow = sheet.getLastRowNum();
+            progressService.beginStage("Importing records...", lastRow);
+
             int imported = 0;
-            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+            for (int r = 1; r <= lastRow; r++) {
+                progressService.advance(r);
                 Row row = sheet.getRow(r);
                 if (row == null) continue;
 

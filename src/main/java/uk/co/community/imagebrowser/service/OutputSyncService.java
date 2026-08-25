@@ -34,24 +34,27 @@ public class OutputSyncService {
     private static final int  DELETE_MAX_ATTEMPTS    = 5;
     private static final long DELETE_RETRY_DELAY_MS  = 100;
 
-    private final Path             inputDir;
-    private final Path             outputDir;
-    private final ThumbnailService thumbnailService;
+    private final Path                  inputDir;
+    private final Path                  outputDir;
+    private final ThumbnailService      thumbnailService;
+    private final ImportProgressService progressService;
 
     public OutputSyncService(
             @Value("${app.spreadsheet.path:data/input/Archive_Index_Numbers_Current.xlsx}") String spreadsheetPath,
             @Value("${app.data.output-dir:data/output}") String outputDir,
-            ThumbnailService thumbnailService) {
+            ThumbnailService thumbnailService,
+            ImportProgressService progressService) {
         this.inputDir  = Path.of(spreadsheetPath).toAbsolutePath().normalize().getParent();
         this.outputDir = Path.of(outputDir);
         this.thumbnailService = thumbnailService;
+        this.progressService  = progressService;
     }
 
     /**
      * Wipes everything below the output directory, then copies the input
      * directory tree into it.
      *
-     * @return the number of files copied
+     * @return the number of images copied (excludes the top-level spreadsheet file)
      */
     public int sync() throws IOException {
         clearOutputDir();
@@ -120,9 +123,11 @@ public class OutputSyncService {
             return 0;
         }
 
-        int count = 0;
+        int processed  = 0;
+        int imageCount = 0;
         try (var walk = Files.walk(inputDir)) {
             var files = walk.filter(Files::isRegularFile).toList();
+            progressService.beginStage("Copying files...", files.size());
             for (Path source : files) {
                 Path   relative   = inputDir.relativize(source);
                 boolean topLevel  = relative.getNameCount() == 1;
@@ -133,6 +138,7 @@ public class OutputSyncService {
                 Files.createDirectories(targetDirForFile);
 
                 if (topLevel) {
+                    // The spreadsheet itself, not an image — copied but not counted.
                     Path targetFile = targetDirForFile.resolve(source.getFileName().toString());
                     Files.copy(source, targetFile, StandardCopyOption.REPLACE_EXISTING);
                 } else {
@@ -140,11 +146,13 @@ public class OutputSyncService {
                     Path   targetFile = targetDirForFile.resolve(FULL_PREFIX + fileName);
                     Files.copy(source, targetFile, StandardCopyOption.REPLACE_EXISTING);
                     writeThumbnail(source, fileName, targetDirForFile);
+                    imageCount++;
                 }
-                count++;
+                processed++;
+                progressService.advance(processed);
             }
         }
-        return count;
+        return imageCount;
     }
 
     private void writeThumbnail(Path source, String fileName, Path targetDir) {
