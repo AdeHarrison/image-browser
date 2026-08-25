@@ -105,7 +105,7 @@ public class ImageController {
                          alt="%s"
                          loading="lazy"
                          width="128" height="128">
-                    <span class="card-sheet">Folder: %s</span>
+                    <span class="card-sheet image-caption">In Folder: %s</span>
                 </div>
             """.formatted(r.id(), description, description, r.id(), description, escapeHtml(r.folder())));
         }
@@ -120,7 +120,7 @@ public class ImageController {
             <div id="browse-nav" class="browse-nav" hx-swap-oob="true">
                 <button type="button" hx-get="/browse?page=0" hx-target="#grid" %s>First</button>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Previous</button>
-                <span class="browse-page">Page %d of %d (%,d images found)</span>
+                <span class="browse-page image-caption">Page %d of %d (%,d images found)</span>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Next</button>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Last</button>
             </div>
