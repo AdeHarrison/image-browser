@@ -156,8 +156,7 @@ class AdminControllerTest {
 
         mvc.perform(post("/admin/reload").sessionAttr("admin", true))
            .andExpect(status().isOk())
-           .andExpect(content().string(containsString("7 file(s) copied")))
-           .andExpect(content().string(containsString("12 record(s) imported")));
+           .andExpect(content().string(containsString("7 image(s) copied")));
     }
 
     @Test

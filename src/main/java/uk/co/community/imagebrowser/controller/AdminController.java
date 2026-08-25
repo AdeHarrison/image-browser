@@ -98,9 +98,8 @@ public class AdminController {
         }
         try {
             int copied   = outputSyncService.sync();
-            int imported = aviationImportService.reimport();
-            return "<p class='success'>✓ Output folder rebuilt: %d file(s) copied. %d record(s) imported.</p>"
-                    .formatted(copied, imported);
+            aviationImportService.reimport();
+            return "<p class='success'>✓ %d image(s) copied.</p>".formatted(copied);
         } catch (Exception e) {
             log.error("Admin reload failed: {}", e.getMessage(), e);
             return "<p class='error'>Reload failed: %s</p>".formatted(e.getMessage());
