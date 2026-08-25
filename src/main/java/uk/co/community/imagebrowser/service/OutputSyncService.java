@@ -31,6 +31,9 @@ public class OutputSyncService {
     private static final String FULL_PREFIX  = "FULL-";
     private static final String THUMB_PREFIX = "THUMB-";
 
+    private static final int  DELETE_MAX_ATTEMPTS    = 5;
+    private static final long DELETE_RETRY_DELAY_MS  = 100;
+
     private final Path             inputDir;
     private final Path             outputDir;
     private final ThumbnailService thumbnailService;
@@ -65,14 +68,50 @@ public class OutputSyncService {
         try (var walk = Files.walk(outputDir)) {
             walk.filter(path -> !path.equals(outputDir))
                 .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
+                .forEach(this::deleteWithRetry);
+        }
+    }
+
+    /**
+     * Deletes a path, retrying on IOException before giving up. On Windows,
+     * cloud-sync clients (e.g. Google Drive Desktop, OneDrive) or antivirus
+     * scanners can briefly hold an open handle on, or drop their own transient
+     * marker files into, a directory that was just written — causing a
+     * transient AccessDeniedException on delete that doesn't happen on Linux
+     * (no such client). A short retry lets the lock/race clear.
+     *
+     * If a directory still can't be removed after retries — e.g. the sync
+     * client keeps re-populating it faster than we can retry — it's logged
+     * and left in place rather than failing the whole reload: copyTree()
+     * recreates directories as needed and overwrites files, so a stray
+     * leftover directory is harmless and will get cleaned up on a later
+     * reload once the sync settles. Files still fail hard, since a file we
+     * can't remove may be stale content the new import no longer produces.
+     */
+    private void deleteWithRetry(Path path) {
+        IOException lastFailure = null;
+        for (int attempt = 1; attempt <= DELETE_MAX_ATTEMPTS; attempt++) {
+            try {
+                Files.delete(path);
+                return;
+            } catch (IOException e) {
+                lastFailure = e;
+                if (attempt < DELETE_MAX_ATTEMPTS) {
                     try {
-                        Files.delete(path);
-                    } catch (IOException e) {
+                        Thread.sleep(DELETE_RETRY_DELAY_MS * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
                         throw new UncheckedIOException(e);
                     }
-                });
+                }
+            }
         }
+        if (Files.isDirectory(path)) {
+            log.warn("Could not remove directory {} after {} attempts, leaving it in place: {}",
+                    path, DELETE_MAX_ATTEMPTS, lastFailure.getMessage());
+            return;
+        }
+        throw new UncheckedIOException(lastFailure);
     }
 
     private int copyTree() throws IOException {
