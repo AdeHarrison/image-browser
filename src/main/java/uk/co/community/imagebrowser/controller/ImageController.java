@@ -81,15 +81,16 @@ public class ImageController {
     private String renderCards(List<AviationImageSummary> results) {
         var sb = new StringBuilder();
         for (AviationImageSummary r : results) {
+            String description = escapeHtml(r.description());
             sb.append("""
-                <div class="card">
+                <div class="card" data-description="%s">
                     <img src="/thumbnail/%d"
                          alt="%s"
                          loading="lazy"
                          width="128" height="128">
                     <span class="card-sheet">Folder: %s</span>
                 </div>
-            """.formatted(r.id(), escapeHtml(r.description()), escapeHtml(r.folder())));
+            """.formatted(description, r.id(), description, escapeHtml(r.folder())));
         }
         return sb.toString();
     }
