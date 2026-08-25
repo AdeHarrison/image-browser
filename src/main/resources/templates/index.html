@@ -45,6 +45,22 @@
 <!-- Thumbnail description tooltip -->
 <div id="thumb-tooltip" class="thumb-tooltip"></div>
 
+<!-- Full image viewer -->
+<div id="modal-backdrop">
+    <div id="modal" class="image-modal">
+        <button type="button" class="modal-close" aria-label="Close">&times;</button>
+        <img id="modal-image" class="full-image" src="" alt="">
+        <p id="modal-description" class="image-caption"></p>
+        <div class="nav-bar">
+            <button type="button" id="nav-first">First</button>
+            <button type="button" id="nav-prev">Previous</button>
+            <span id="nav-label" class="nav-label"></span>
+            <button type="button" id="nav-next">Next</button>
+            <button type="button" id="nav-last">Last</button>
+        </div>
+    </div>
+</div>
+
 <script>
     var searchInput = document.getElementById('search-input');
 
@@ -115,6 +131,96 @@
             if (!card || (evt.relatedTarget && card.contains(evt.relatedTarget))) return;
             hideTooltip();
         });
+    })();
+
+    // Full image viewer — click a thumbnail to open it, navigate the current
+    // search/browse result set with First/Previous/Next/Last (or Home/Left/Right/End),
+    // and highlight the corresponding thumbnail behind the modal as it moves.
+    (function () {
+        var grid        = document.getElementById('grid');
+        var backdrop     = document.getElementById('modal-backdrop');
+        var modalImage   = document.getElementById('modal-image');
+        var modalDesc    = document.getElementById('modal-description');
+        var navLabel     = document.getElementById('nav-label');
+        var navFirst     = document.getElementById('nav-first');
+        var navPrev      = document.getElementById('nav-prev');
+        var navNext      = document.getElementById('nav-next');
+        var navLast      = document.getElementById('nav-last');
+        var closeBtn     = document.querySelector('#modal-backdrop .modal-close');
+
+        var viewerIds   = [];
+        var viewerIndex = -1;
+        var activeCard  = null;
+
+        function highlight(card) {
+            if (activeCard) activeCard.classList.remove('active');
+            activeCard = card || null;
+            if (activeCard) {
+                activeCard.classList.add('active');
+                activeCard.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function showAt(index) {
+            if (index < 0 || index >= viewerIds.length) return;
+            viewerIndex = index;
+
+            var id   = viewerIds[index];
+            var card = grid.querySelector('.card[data-id="' + id + '"]');
+
+            modalImage.src = '/image/' + id;
+            modalImage.alt = card ? card.querySelector('img').alt : '';
+            modalDesc.textContent = card ? card.getAttribute('data-description') : '';
+            navLabel.textContent  = (index + 1) + ' of ' + viewerIds.length;
+
+            navFirst.disabled = navPrev.disabled = index === 0;
+            navLast.disabled  = navNext.disabled = index === viewerIds.length - 1;
+
+            highlight(card);
+        }
+
+        function openViewer(card) {
+            var cards = Array.prototype.slice.call(grid.querySelectorAll('.card[data-id]'));
+            viewerIds = cards.map(function (c) { return c.getAttribute('data-id'); });
+
+            var index = cards.indexOf(card);
+            if (index === -1) return;
+
+            backdrop.classList.add('open');
+            document.addEventListener('keydown', onKeydown);
+            showAt(index);
+        }
+
+        function closeViewer() {
+            backdrop.classList.remove('open');
+            document.removeEventListener('keydown', onKeydown);
+            highlight(null);
+        }
+
+        function onKeydown(evt) {
+            switch (evt.key) {
+                case 'ArrowLeft':  evt.preventDefault(); showAt(viewerIndex - 1); break;
+                case 'ArrowRight': evt.preventDefault(); showAt(viewerIndex + 1); break;
+                case 'Home':       evt.preventDefault(); showAt(0); break;
+                case 'End':        evt.preventDefault(); showAt(viewerIds.length - 1); break;
+                case 'Escape':     evt.preventDefault(); closeViewer(); break;
+            }
+        }
+
+        grid.addEventListener('click', function (evt) {
+            var card = evt.target.closest('.card[data-id]');
+            if (card) openViewer(card);
+        });
+
+        backdrop.addEventListener('click', function (evt) {
+            if (evt.target === backdrop) closeViewer();
+        });
+        closeBtn.addEventListener('click', closeViewer);
+
+        navFirst.addEventListener('click', function () { showAt(0); });
+        navPrev.addEventListener('click',  function () { showAt(viewerIndex - 1); });
+        navNext.addEventListener('click',  function () { showAt(viewerIndex + 1); });
+        navLast.addEventListener('click',  function () { showAt(viewerIds.length - 1); });
     })();
 </script>
 

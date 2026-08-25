@@ -27,6 +27,7 @@ public class AviationImageService {
     private static final Logger log = LoggerFactory.getLogger(AviationImageService.class);
 
     private static final String THUMB_PREFIX = "THUMB-";
+    private static final String FULL_PREFIX  = "FULL-";
 
     private final AviationImageRepository repository;
     private final Path                    outputDir;
@@ -58,19 +59,27 @@ public class AviationImageService {
         return repository.findPage(page * browsePageSize, browsePageSize);
     }
 
-    public Optional<byte[]> getThumbnail(long id) {
-        return repository.findById(id).flatMap(this::readThumbnail);
+    public Optional<AviationImageSummary> findById(long id) {
+        return repository.findById(id);
     }
 
-    private Optional<byte[]> readThumbnail(AviationImageSummary summary) {
+    public Optional<byte[]> getThumbnail(long id) {
+        return repository.findById(id).flatMap(summary -> readImageFile(summary, THUMB_PREFIX));
+    }
+
+    public Optional<byte[]> getFullImage(long id) {
+        return repository.findById(id).flatMap(summary -> readImageFile(summary, FULL_PREFIX));
+    }
+
+    private Optional<byte[]> readImageFile(AviationImageSummary summary, String prefix) {
         String diskFileName = summary.folder() + "-" + summary.fileName();
         Path path = outputDir.resolve(summary.category())
                               .resolve(summary.folder())
-                              .resolve(THUMB_PREFIX + diskFileName);
+                              .resolve(prefix + diskFileName);
         try {
             return Files.exists(path) ? Optional.of(Files.readAllBytes(path)) : Optional.empty();
         } catch (IOException e) {
-            log.warn("Could not read thumbnail at {}: {}", path, e.getMessage());
+            log.warn("Could not read image at {}: {}", path, e.getMessage());
             return Optional.empty();
         }
     }

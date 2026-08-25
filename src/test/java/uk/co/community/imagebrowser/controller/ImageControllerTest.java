@@ -142,4 +142,37 @@ class ImageControllerTest {
         mvc.perform(get("/thumbnail/99"))
            .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("GET /image/{id} returns 200 with full image bytes and content type from filename")
+    void fullImage_WhenIdKnown_ShouldReturn200WithImageBytes() throws Exception {
+        when(imageService.findById(1L)).thenReturn(Optional.of(
+                new AviationImageSummary(1L, "AVIATION", "4", "3.png", "desc")));
+        when(imageService.getFullImage(1L)).thenReturn(Optional.of(new byte[]{1, 2, 3}));
+
+        mvc.perform(get("/image/1"))
+           .andExpect(status().isOk())
+           .andExpect(content().contentType("image/png"))
+           .andExpect(header().string("Cache-Control", containsString("max-age")));
+    }
+
+    @Test
+    @DisplayName("GET /image/{id} returns 404 when the record is unknown")
+    void fullImage_WhenIdUnknown_ShouldReturn404() throws Exception {
+        when(imageService.findById(99L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/image/99"))
+           .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /image/{id} returns 404 when the file is missing on disk")
+    void fullImage_WhenFileMissing_ShouldReturn404() throws Exception {
+        when(imageService.findById(1L)).thenReturn(Optional.of(
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "desc")));
+        when(imageService.getFullImage(1L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/image/1"))
+           .andExpect(status().isNotFound());
+    }
 }

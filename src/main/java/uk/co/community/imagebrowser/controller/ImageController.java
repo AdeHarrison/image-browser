@@ -10,6 +10,7 @@ import uk.co.community.imagebrowser.model.AviationImageSummary;
 import uk.co.community.imagebrowser.service.AviationImageService;
 
 import java.util.List;
+import java.util.Optional;
 
 @Controller
 public class ImageController {
@@ -83,14 +84,14 @@ public class ImageController {
         for (AviationImageSummary r : results) {
             String description = escapeHtml(r.description());
             sb.append("""
-                <div class="card" data-description="%s">
+                <div class="card" data-id="%d" data-description="%s">
                     <img src="/thumbnail/%d"
                          alt="%s"
                          loading="lazy"
                          width="128" height="128">
                     <span class="card-sheet">Folder: %s</span>
                 </div>
-            """.formatted(description, r.id(), description, escapeHtml(r.folder())));
+            """.formatted(r.id(), description, r.id(), description, escapeHtml(r.folder())));
         }
         return sb.toString();
     }
@@ -129,9 +130,34 @@ public class ImageController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/image/{id}")
+    public ResponseEntity<byte[]> fullImage(@PathVariable long id) {
+        Optional<AviationImageSummary> summary = imageService.findById(id);
+        if (summary.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return imageService.getFullImage(id)
+                .map(bytes -> ResponseEntity.ok()
+                        .header(HttpHeaders.CACHE_CONTROL, CACHE_HEADER)
+                        .contentType(contentTypeFor(summary.get().fileName()))
+                        .body(bytes))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    private MediaType contentTypeFor(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        String ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase() : "";
+        return switch (ext) {
+            case "png"         -> MediaType.IMAGE_PNG;
+            case "gif"         -> MediaType.IMAGE_GIF;
+            case "jpg", "jpeg" -> MediaType.IMAGE_JPEG;
+            default            -> MediaType.APPLICATION_OCTET_STREAM;
+        };
+    }
 
     private String escapeHtml(String s) {
         if (s == null) return "";
