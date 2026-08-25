@@ -170,8 +170,8 @@
     })();
 
     // Full image viewer — click a thumbnail to open it, navigate the current
-    // search/browse result set with First/Previous/Next/Last (or Home/Left/Right/End),
-    // and highlight the corresponding thumbnail behind the modal as it moves.
+    // search/browse result set with the First/Previous/Next/Last buttons (Escape
+    // closes it), and highlight the corresponding thumbnail behind the modal as it moves.
     (function () {
         var grid        = document.getElementById('grid');
         var backdrop     = document.getElementById('modal-backdrop');
@@ -234,12 +234,9 @@
         }
 
         function onKeydown(evt) {
-            switch (evt.key) {
-                case 'ArrowLeft':  evt.preventDefault(); showAt(viewerIndex - 1); break;
-                case 'ArrowRight': evt.preventDefault(); showAt(viewerIndex + 1); break;
-                case 'Home':       evt.preventDefault(); showAt(0); break;
-                case 'End':        evt.preventDefault(); showAt(viewerIds.length - 1); break;
-                case 'Escape':     evt.preventDefault(); closeViewer(); break;
+            if (evt.key === 'Escape') {
+                evt.preventDefault();
+                closeViewer();
             }
         }
 
