@@ -136,21 +136,31 @@ main { padding: 1.2rem 1.5rem; max-width: 1400px; margin: 0 auto; }
     align-items: center;
     gap: 0.75rem;
     margin-top: 1.5rem;
-    padding: 1rem 0;
+    padding: 0.75rem 1.25rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
 }
 .browse-nav:empty { display: none; }
 
 .browse-nav button {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
-    border: 2px solid #ccc;
+    border: none;
     border-radius: 6px;
-    background: white;
+    background: #0066cc;
+    color: white;
     cursor: pointer;
-    transition: border-color 0.15s;
 }
-.browse-nav button:hover:not(:disabled) { border-color: #0066cc; }
-.browse-nav button:disabled { opacity: 0.4; cursor: default; }
+.browse-nav button:hover:not(:disabled) { background: #0052a3; }
+.browse-nav button:disabled {
+    background: #ccc;
+    color: #888;
+    cursor: not-allowed;
+}
 
 .browse-page { color: #555; font-size: 0.9rem; }
 

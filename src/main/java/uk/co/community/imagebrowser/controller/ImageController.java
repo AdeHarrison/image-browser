@@ -15,7 +15,10 @@ import java.util.Optional;
 @Controller
 public class ImageController {
 
-    private static final String CACHE_HEADER = "public, max-age=86400";
+    // "no-store" (not a long max-age) because ids reset to 1 on every admin reload —
+    // a cached response would otherwise show the previous image behind that id for
+    // up to a day after a reimport swapped the underlying spreadsheet/photos.
+    private static final String CACHE_HEADER = "no-store";
 
     // Sanity cap on the client-supplied browse page size (fits-the-screen calc), so a
     // crafted request can't force an enormous single-page query.
@@ -77,7 +80,7 @@ public class ImageController {
                 ? "<p class='no-results'>No images found.</p>"
                 : renderCards(results);
 
-        return grid + renderBrowseNav(page, lastPage);
+        return grid + renderBrowseNav(page, lastPage, total);
     }
 
     private int clampPageSize(Integer requested) {
@@ -109,7 +112,7 @@ public class ImageController {
         return sb.toString();
     }
 
-    private String renderBrowseNav(int page, int lastPage) {
+    private String renderBrowseNav(int page, int lastPage, long total) {
         boolean atFirst = page <= 0;
         boolean atLast  = page >= lastPage;
 
@@ -117,14 +120,14 @@ public class ImageController {
             <div id="browse-nav" class="browse-nav" hx-swap-oob="true">
                 <button type="button" hx-get="/browse?page=0" hx-target="#grid" %s>First</button>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Previous</button>
-                <span class="browse-page">Page %d of %d</span>
+                <span class="browse-page">Page %d of %d (%,d images found)</span>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Next</button>
                 <button type="button" hx-get="/browse?page=%d" hx-target="#grid" %s>Last</button>
             </div>
             """.formatted(
                 atFirst ? "disabled" : "",
                 Math.max(0, page - 1), atFirst ? "disabled" : "",
-                page + 1, lastPage + 1,
+                page + 1, lastPage + 1, total,
                 Math.min(lastPage, page + 1), atLast ? "disabled" : "",
                 lastPage, atLast ? "disabled" : "");
     }

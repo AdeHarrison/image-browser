@@ -19,7 +19,7 @@ import java.util.Optional;
 public class AviationImageRepository {
 
     private static final String SUMMARY_SELECT =
-            "SELECT id, category, folder, file_name, description FROM images";
+            "SELECT id, category, folder, file_name, date, description FROM images";
 
     private final JdbcTemplate jdbc;
 
@@ -38,6 +38,7 @@ public class AviationImageRepository {
             CREATE TABLE images (
                 id          SERIAL PRIMARY KEY,
                 category    TEXT NOT NULL,
+                date        TEXT,
                 description TEXT NOT NULL,
                 folder      TEXT NOT NULL,
                 file_name   TEXT NOT NULL,
@@ -49,9 +50,9 @@ public class AviationImageRepository {
     @Transactional
     public void insert(AviationImageRecord rec) {
         jdbc.update("""
-            INSERT INTO images (category, description, folder, file_name)
-            VALUES (?, ?, ?, ?)
-        """, rec.category(), rec.description(), rec.folder(), rec.fileName());
+            INSERT INTO images (category, date, description, folder, file_name)
+            VALUES (?, ?, ?, ?, ?)
+        """, rec.category(), rec.date(), rec.description(), rec.folder(), rec.fileName());
     }
 
     // ---------------------------------------------------------------
@@ -96,6 +97,7 @@ public class AviationImageRepository {
                 rs.getString("category"),
                 rs.getString("folder"),
                 rs.getString("file_name"),
+                rs.getString("date"),
                 rs.getString("description"));
     }
 

@@ -90,7 +90,7 @@ public class AviationImportService {
                         ? "%s (%s)".formatted(description, date)
                         : description;
 
-                repository.insert(new AviationImageRecord(CATEGORY, combinedDescription, folder, fileName));
+                repository.insert(new AviationImageRecord(CATEGORY, date, combinedDescription, folder, fileName));
                 imported++;
             }
 

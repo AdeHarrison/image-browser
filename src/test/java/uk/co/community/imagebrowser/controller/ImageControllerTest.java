@@ -48,7 +48,7 @@ class ImageControllerTest {
     @DisplayName("GET /search returns grid HTML fragment with thumbnail and folder")
     void search_WhenQueryMatches_ShouldReturnGridFragment() throws Exception {
         var results = List.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "Mr Hucks publicity photograph"));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, "Mr Hucks publicity photograph"));
         when(imageService.search("hucks")).thenReturn(results);
 
         mvc.perform(get("/search").param("q", "hucks"))
@@ -71,7 +71,7 @@ class ImageControllerTest {
     @DisplayName("GET /search escapes HTML in description to prevent XSS")
     void search_WhenDescriptionContainsHtml_ShouldEscapeToPreventXss() throws Exception {
         var results = List.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "<script>alert('xss')</script>"));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, "<script>alert('xss')</script>"));
         when(imageService.search("script")).thenReturn(results);
 
         mvc.perform(get("/search").param("q", "script"))
@@ -83,7 +83,7 @@ class ImageControllerTest {
     @Test
     @DisplayName("GET /search tolerates null description without erroring")
     void search_WhenDescriptionNull_ShouldRenderWithoutError() throws Exception {
-        var results = List.of(new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null));
+        var results = List.of(new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, null));
         when(imageService.search("x")).thenReturn(results);
 
         mvc.perform(get("/search").param("q", "x"))
@@ -94,7 +94,7 @@ class ImageControllerTest {
     @DisplayName("GET /browse returns grid HTML fragment plus first/prev/next/last nav")
     void browse_WhenPageHasResults_ShouldReturnGridAndNav() throws Exception {
         var results = List.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "Mr Hucks publicity photograph"));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, "Mr Hucks publicity photograph"));
         when(imageService.browsePageSize()).thenReturn(60);
         when(imageService.count()).thenReturn(1L);
         when(imageService.browse(0, 60)).thenReturn(results);
@@ -115,7 +115,7 @@ class ImageControllerTest {
         when(imageService.browsePageSize()).thenReturn(60);
         when(imageService.count()).thenReturn(120L);
         when(imageService.browse(1, 60)).thenReturn(List.of(
-                new AviationImageSummary(61L, "AVIATION", "5", "1.jpg", "desc")));
+                new AviationImageSummary(61L, "AVIATION", "5", "1.jpg", null, "desc")));
 
         mvc.perform(get("/browse").param("page", "99"))
            .andExpect(status().isOk())
@@ -128,7 +128,7 @@ class ImageControllerTest {
     void browse_WhenSizeGiven_ShouldUseClampedSize() throws Exception {
         when(imageService.count()).thenReturn(1000L);
         when(imageService.browse(0, 300)).thenReturn(List.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "desc")));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, "desc")));
 
         mvc.perform(get("/browse").param("page", "0").param("size", "5000"))
            .andExpect(status().isOk())
@@ -143,7 +143,7 @@ class ImageControllerTest {
         mvc.perform(get("/thumbnail/1"))
            .andExpect(status().isOk())
            .andExpect(content().contentType("image/jpeg"))
-           .andExpect(header().string("Cache-Control", containsString("max-age")));
+           .andExpect(header().string("Cache-Control", containsString("no-store")));
     }
 
     @Test
@@ -159,13 +159,13 @@ class ImageControllerTest {
     @DisplayName("GET /image/{id} returns 200 with full image bytes and content type from filename")
     void fullImage_WhenIdKnown_ShouldReturn200WithImageBytes() throws Exception {
         when(imageService.findById(1L)).thenReturn(Optional.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.png", "desc")));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.png", null, "desc")));
         when(imageService.getFullImage(1L)).thenReturn(Optional.of(new byte[]{1, 2, 3}));
 
         mvc.perform(get("/image/1"))
            .andExpect(status().isOk())
            .andExpect(content().contentType("image/png"))
-           .andExpect(header().string("Cache-Control", containsString("max-age")));
+           .andExpect(header().string("Cache-Control", containsString("no-store")));
     }
 
     @Test
@@ -181,7 +181,7 @@ class ImageControllerTest {
     @DisplayName("GET /image/{id} returns 404 when the file is missing on disk")
     void fullImage_WhenFileMissing_ShouldReturn404() throws Exception {
         when(imageService.findById(1L)).thenReturn(Optional.of(
-                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "desc")));
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", null, "desc")));
         when(imageService.getFullImage(1L)).thenReturn(Optional.empty());
 
         mvc.perform(get("/image/1"))

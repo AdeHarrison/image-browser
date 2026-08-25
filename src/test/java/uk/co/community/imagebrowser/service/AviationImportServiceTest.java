@@ -68,9 +68,9 @@ class AviationImportServiceTest {
 
         List<AviationImageRecord> inserted = captor.getAllValues();
         assertThat(inserted.get(0)).isEqualTo(
-                new AviationImageRecord("AVIATION", "Mr Hucks publicity photograph (1911)", "4", "3.jpg"));
+                new AviationImageRecord("AVIATION", "1911", "Mr Hucks publicity photograph (1911)", "4", "3.jpg"));
         assertThat(inserted.get(1)).isEqualTo(
-                new AviationImageRecord("AVIATION", "Vickers Vimy bomber forced landing on beach", "7", "1.jpg"));
+                new AviationImageRecord("AVIATION", null, "Vickers Vimy bomber forced landing on beach", "7", "1.jpg"));
     }
 
     /**

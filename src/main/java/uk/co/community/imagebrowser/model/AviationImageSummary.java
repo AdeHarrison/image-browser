@@ -10,5 +10,6 @@ public record AviationImageSummary(
         String category,
         String folder,
         String fileName,
+        String date,
         String description
 ) {}

@@ -15,11 +15,10 @@ import java.util.Optional;
 
 /**
  * Read side of the AVIATION image data: description search plus reading
- * thumbnail files back off disk. Source images are physically named
- * "{folder}-{fileName}" (e.g. data/input/AVIATION/4/4-3.jpg for folder=4,
- * fileName=3.jpg) — OutputSyncService copies them verbatim under that name
- * with a THUMB-/FULL- prefix, so the DB's fileName column alone isn't the
- * real filename on disk; the folder prefix has to be reattached here.
+ * thumbnail files back off disk. Both "Folder/Page No" (e.g. "01") and
+ * "Image File Name" (e.g. "01-01.jpg", already folder-prefixed) are used as-is —
+ * they match the zero-padded directory/file names OutputSyncService mirrored
+ * from data/input/AVIATION under a THUMB-/FULL- prefix.
  */
 @Service
 public class AviationImageService {
@@ -44,6 +43,10 @@ public class AviationImageService {
 
     public List<AviationImageSummary> search(String query) {
         return repository.search(query);
+    }
+
+    public static String getThumbPrefix() {
+        return THUMB_PREFIX;
     }
 
     public long count() {
@@ -72,10 +75,9 @@ public class AviationImageService {
     }
 
     private Optional<byte[]> readImageFile(AviationImageSummary summary, String prefix) {
-        String diskFileName = summary.folder() + "-" + summary.fileName();
         Path path = outputDir.resolve(summary.category())
                               .resolve(summary.folder())
-                              .resolve(prefix + diskFileName);
+                              .resolve(prefix + summary.fileName());
         try {
             return Files.exists(path) ? Optional.of(Files.readAllBytes(path)) : Optional.empty();
         } catch (IOException e) {
