@@ -21,14 +21,6 @@ buildNumber.properties
 *.log
 logs/
 
-# SQLite databases and write-ahead/shared-memory files (generated at runtime)
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-identifier.sqlite
-:memory:?cache=shared
-
 # IntelliJ IDEA
 .idea/
 *.iml
@@ -62,3 +54,4 @@ Thumbs.db
 .~lock.Archive_Index_Numbers_Current.xlsx#
 /data/output/
 /.~lock.Changes.odp#
+/.mcp.json

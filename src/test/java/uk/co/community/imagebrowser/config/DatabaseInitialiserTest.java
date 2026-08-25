@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uk.co.community.imagebrowser.repository.ImageRepository;
-import uk.co.community.imagebrowser.service.SpreadsheetImportService;
+import uk.co.community.imagebrowser.repository.AviationImageRepository;
 
 import static org.mockito.Mockito.*;
 
@@ -14,14 +13,13 @@ import static org.mockito.Mockito.*;
 @DisplayName("DatabaseInitialiser")
 class DatabaseInitialiserTest {
 
-    @Mock private ImageRepository          repository;
-    @Mock private SpreadsheetImportService importService;
+    @Mock private AviationImageRepository aviationRepository;
 
     @Test
-    @DisplayName("initialise is currently a no-op — DB-backed import is disabled for now")
-    void initialise_WhenInvoked_ShouldNotTouchRepositoryOrImportService() {
-        new DatabaseInitialiser(repository, importService).initialise();
+    @DisplayName("initialise creates the AVIATION images table if it doesn't exist")
+    void initialise_WhenInvoked_ShouldCreateAviationSchemaIfNotExists() {
+        new DatabaseInitialiser(aviationRepository).initialise();
 
-        verifyNoInteractions(repository, importService);
+        verify(aviationRepository).createSchemaIfNotExists();
     }
 }

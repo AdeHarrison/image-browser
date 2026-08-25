@@ -4,84 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Locally-hosted image browser for community centres (Spring Boot 4, Java 21). Images are
-extracted from embedded pictures in an Excel `.xlsx` workbook, stored in SQLite as BLOBs, and
-served to a browser UI. See `README.md` for deployment/operations detail and `docs/ARCHITECTURE.md`
-for diagrams of the class structure and runtime flows.
+Locally-hosted image browser for community centres (Spring Boot 4, Java 21). Images live as
+files on disk (synced from an Excel `.xlsx` workbook's input folder), with only metadata —
+category, folder, file name, date, description — stored in PostgreSQL. See `README.md` for
+deployment/operations detail.
 
 ## Commands
 
 ```bash
 mvn clean package          # build fat JAR -> target/image-browser-1.0.0.jar
-mvn spring-boot:run        # run in dev (http://localhost:7000)
+mvn spring-boot:run        # run in dev (http://localhost:7000) — needs PostgreSQL, see docker-compose.yml
 mvn test                   # unit tests only (Surefire excludes *IT.java / *IntegrationTest.java)
 mvn verify                 # unit + integration tests (Failsafe runs *IT.java / *IntegrationTest.java)
 
 # single test class / method
-mvn test -Dtest=ImageSearchServiceTest
-mvn test -Dtest=ImageSearchServiceTest#methodName
-mvn verify -Dit.test=ApplicationIntegrationIT   # single integration test
+mvn test -Dtest=AviationImportServiceTest
+mvn test -Dtest=AviationImportServiceTest#methodName
 ```
 
-Integration tests (`*IT.java`) run against an in-memory SQLite DB (`jdbc:sqlite::memory:?cache=shared`,
-HikariCP pool size 1) configured in `src/test/resources/application-test.properties`.
+There are currently no `*IT.java` integration tests in the repo (the old one ran against an
+in-memory embedded DB from a since-removed architecture — see below); `mvn verify` will simply
+find none to run via Failsafe.
 
 ## Architecture
 
-Request/data flow: **Browser (HTMX) → Controller → Service → ImageRepository → SQLite**, with a
-Caffeine cache fronting BLOB reads.
+Request/data flow: **Browser (HTMX) → `ImageController` → `AviationImageService` →
+`AviationImageRepository`** (PostgreSQL, metadata only) **+ direct filesystem reads** under
+`data/output/{category}/{folder}/` for thumbnail/full-image bytes. There is no in-process image
+cache — each `/thumbnail/{id}` and `/image/{id}` request reads straight off disk (the OS page
+cache is relied on for hot paths).
 
-**Startup sequence** (`config/DatabaseInitialiser` `@PostConstruct`):
-1. `ImageRepository.createSchema()` — idempotent `CREATE TABLE IF NOT EXISTS`.
-2. `SpreadsheetImportService.importIfUpdated()` — imports only if the spreadsheet version changed.
-3. `ImageCacheService.schedulePreload()` — async warm-up of the thumbnail cache (`@Async`,
-   enabled via `@EnableAsync` on the application class).
+**Startup** — three independent `@PostConstruct` components, order between them not guaranteed:
+1. `config/DatabaseInitialiser` — `AviationImageRepository.createSchemaIfNotExists()`, idempotent,
+   so the `images` table (and a count of 0) exists even before an admin has ever imported.
+2. `admin/AdminPasswordService.load()` — calls `AdminConfigRepository.createSchemaIfNotExists()`
+   itself (idempotent) rather than relying on startup order, then reads the BCrypt hash from the
+   `app_config` table (key `admin_password_hash`), seeding a hash of the default password
+   `changeme` on first run.
+3. `config/SpreadsheetAvailabilityCheck` — confirms `app.spreadsheet.path` exists and contains an
+   `AVIATION` sheet; throws (failing startup) if not. This is a hard requirement, not advisory.
 
-**Version-gated import.** The importer reads a timestamp string from cell `B1` of a sheet named
-`Metadata` and compares it to the `last_updated` row in the `app_config` table, both parsed as
-`LocalDateTime` (ISO format, e.g. `2026-05-22T10:30:00`). If a stored version exists and the
-spreadsheet's timestamp is not *after* it → import is skipped (fast startup). Otherwise (no stored
-version yet, or the spreadsheet timestamp is later) → `clearAll()` + full reimport + cache
-invalidate. Admin "reload" calls `forceImport()`, which reimports unconditionally. **Editing images
-in the spreadsheet without advancing `Metadata!B1` to a later timestamp will NOT trigger a
-reimport.**
+**No version-gated import.** Unlike a typical "only reimport if changed" design, every admin
+**Reload** (`POST /admin/reload`, `AdminReloadService.runReload()`, run `@Async` so the request
+returns immediately and the UI polls `GET /admin/reload/progress` via `ImportProgressService`)
+does a full resync, in order:
+1. `OutputSyncService.sync()` — wipes `data/output`, then copies `data/input` into it: top-level
+   files (the spreadsheet) as-is, nested images as `FULL-{name}` plus a generated `THUMB-{name}`
+   thumbnail (`ThumbnailService`). No DB writes.
+2. `AviationImportService.reimport()` — reads the `AVIATION` sheet (columns: `REF. NO.`,
+   `LOCATION`, `DATE`, `DESCRIPTION/ NOTES`, `Folder/Page No`, `Image File Name`), drops and
+   recreates the PostgreSQL `images` table (`AviationImageRepository.resetSchema()`), and inserts
+   one row per valid image (a row is skipped, not an error, when description/folder/file name is
+   blank). `DATE` and `DESCRIPTION` are combined into one searchable string, e.g.
+   `"Mr Hucks publicity photograph (1911)"` (the `(date)` suffix omitted when `DATE` is blank).
 
-**SQLite schema is maintained manually, not by ORM or FTS triggers.** `images_fts` is an FTS5
-external-content table (`content='images'`) but there are **no sync triggers** — `ImageRepository.insert()`
-writes to `images`, `image_meta`, and `images_fts` in three explicit statements, and `clearAll()`
-deletes from all three plus the `last_updated` config row. If you add a column that should be
-searchable, update both the `insert` and the `createSchema` FTS definition. All DB access is raw
-`JdbcTemplate` SQL in `ImageRepository` — there is no JPA/Hibernate.
-
-**Search.** `repository.search()` builds an FTS5 `MATCH` query by appending `*` to the token string
-for prefix matching, ordered by FTS `rank`. Blank query falls back to `findAll` ordered by `id`.
-Navigation (first/prev/next/last) is pure `id`-ordering via `WHERE id >/< ?` queries; there is no
-stored sort order beyond insertion order.
-
-**Two-tier image cache (`service/ImageCacheService`).** Despite `@EnableCaching` and the
-`spring.cache.*` properties, image BLOBs do NOT use Spring's cache abstraction. This service builds
-**two manual Caffeine caches** (thumbnail and full-image) with independent byte-weight budgets,
-`expireAfterAccess` TTL, and `softValues()` as a GC safety net. Cache misses load from SQLite via
-`ImageRepository`. Always go through `ImageCacheService` for `/thumbnail/{id}` and `/image/{id}/bytes`.
+**Search.** `AviationImageRepository.search(term)` does a partial, case-insensitive `ILIKE
+'%term%'` match against `description` (wildcard characters in the input are escaped so they're
+matched literally), ordered by `id`. A blank term returns every row. All DB access is raw
+`JdbcTemplate` SQL — there is no JPA/Hibernate, and no FTS/trigram index.
 
 **HTML fragments are Java text blocks, not Thymeleaf.** `ImageController` returns `@ResponseBody`
-HTML strings (search cards, modal, viewer) built with `String.formatted(...)` for HTMX swaps;
-only the base pages (`index.html`, `admin/*.html`) are Thymeleaf templates. When emitting any
-user/data-derived value into these fragments, route it through `escapeHtml(...)` — that is the only
-XSS guard. Infinite scroll keys off a page being exactly full (`results.size() == 30`, the
-`app.search.page-size` default) emitting a `hx-trigger="revealed"` load-more div.
+HTML strings (search/browse cards, browse-nav) built with `String.formatted(...)` for HTMX swaps;
+only the base pages (`index.html`, `admin/*.html`) are Thymeleaf templates. The full-image
+viewer/modal is client-side JS in `index.html` hitting `/image/{id}` directly — there's no
+server-rendered modal fragment. When emitting any user/data-derived value into a fragment, route
+it through `escapeHtml(...)` — that is the only XSS guard.
 
-**`ImageSummary` deliberately omits BLOB fields** so list/search queries never load image bytes;
-bytes are fetched only by the dedicated binary endpoints.
+**`AviationImageSummary` deliberately omits any image bytes** — just enough to locate the file on
+disk (`category`/`folder`/`fileName`) and render a card. Binary bytes are only read by
+`AviationImageService.getThumbnail()`/`getFullImage()`, backing the dedicated `/thumbnail/{id}`
+and `/image/{id}` endpoints.
 
-**Admin single-session (`admin/AdminSessionManager`).** A single `AtomicReference<String>` holds the
-one allowed admin session id; `login`/`logout` are lock-free `compareAndSet`. Auth checks in
-`AdminController` require both the `admin` HttpSession attribute AND `isActiveSession(sessionId)`.
-The admin password is stored as a one-way BCrypt hash in the `app_config` table
-(key `admin_password_hash`, see `AppConfig.ADMIN_PASSWORD_HASH_KEY`). `AdminPasswordService.load()`
-calls `repository.createSchema()` (idempotent) before reading config, since its `@PostConstruct`
-isn't ordered relative to `DatabaseInitialiser`'s. If no hash is stored yet, it seeds one for the
-default password `changeme`. Admins can change it via `POST /admin/change-password`
+**Admin single-session (`admin/AdminSessionManager`).** A single `AtomicReference<String>` holds
+the one allowed admin session id; `login`/`logout` are lock-free `compareAndSet`. Auth checks in
+`AdminController.isAdmin()` require both the `admin` HttpSession attribute AND
+`isActiveSession(sessionId)`. Admins change the password via `POST /admin/change-password`
 (`AdminController.changePassword`), which verifies the current password, checks the new password
 against `confirmPassword`, and enforces `AdminPasswordService.MIN_PASSWORD_LENGTH` via
 `setPassword()`.
@@ -90,8 +87,8 @@ against `confirmPassword`, and enforces `AdminPasswordService.MIN_PASSWORD_LENGT
 
 - Package root: `uk.co.community.imagebrowser` (`controller` / `service` / `repository` / `model` /
   `admin` / `config`).
-- Models are Java `record`s (`ImageRecord`, `ImageSummary`, `AppConfig`, plus inner records like
-  `ImportResult`, `NavigationContext`).
+- Models are Java `record`s (`AviationImageRecord`, `AviationImageSummary`, plus inner records
+  like `ImportProgressService.Snapshot`).
 - Lombok is a dependency and is excluded from the fat JAR.
 - All tunables are `@Value("${app.*}")`-injected with inline defaults that mirror
   `application.properties`; keep the two in sync when adding config.

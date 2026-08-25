@@ -17,14 +17,12 @@
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>Community Image Browser</name>
-    <description>Local image browser for community centre — Spring Boot 4 + SQLite + HTMX</description>
+    <description>Local image browser for community centre — Spring Boot 4 + PostgreSQL + HTMX</description>
 
     <properties>
         <java.version>25</java.version>
         <poi.version>5.5.1</poi.version>
-        <caffeine.version>3.1.8</caffeine.version>
         <hikari.version>5.1.0</hikari.version>
-        <sqlite.version>3.45.3.0</sqlite.version>
     </properties>
 
     <dependencies>
@@ -53,14 +51,6 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
-        <!-- SQLite JDBC driver — kept (unused while app.datasource points at PostgreSQL) so the
-             SQLite-backed code paths can be switched back on for comparison. See application.properties. -->
-        <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>${sqlite.version}</version>
-        </dependency>
-
         <!-- PostgreSQL JDBC driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -79,17 +69,6 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>${poi.version}</version>
-        </dependency>
-
-        <!-- Caffeine cache -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-cache</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
-            <version>${caffeine.version}</version>
         </dependency>
 
         <!-- BCrypt for one-way hashing of the admin password -->
@@ -134,7 +113,11 @@
     <build>
         <plugins>
 
-            <!-- Spring Boot fat JAR -->
+            <!-- Spring Boot fat JAR, and (via the build-image goal) the Docker image built
+                 from it using Cloud Native Buildpacks — no separate Dockerfile needed.
+                 Run "mvn spring-boot:build-image" to (re)build image-browser:latest before
+                 "docker compose up" picks it up (see docker-compose.yml). Requires a running
+                 Docker daemon; not bound to the package phase since it needs one. -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -145,6 +128,12 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                    <image>
+                        <name>image-browser:latest</name>
+                        <env>
+                            <BP_JVM_VERSION>${java.version}</BP_JVM_VERSION>
+                        </env>
+                    </image>
                 </configuration>
             </plugin>
 

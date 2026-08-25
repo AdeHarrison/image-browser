@@ -10,13 +10,12 @@ A locally-hosted image browser for community centres. Visitors search and view i
 |---|---|
 | Language | Java 21 |
 | Framework | Spring Boot 4.0.6 |
-| Database | SQLite (single file, zero admin) |
+| Database | PostgreSQL (metadata only — images are stored as files) |
 | Connection pool | HikariCP |
-| Full-text search | SQLite FTS5 |
-| Image cache | Caffeine (in-memory, weight-bounded) |
-| Excel reading | Apache POI 5.3 |
+| Search | PostgreSQL `ILIKE` (partial, case-insensitive) against description |
+| Excel reading | Apache POI 5.5.1 |
 | Frontend | Thymeleaf + HTMX |
-| Build | Maven (fat JAR via Spring Boot plugin) |
+| Build | Maven (fat JAR via Spring Boot plugin; `spring-boot:build-image` also builds a Docker image) |
 
 ---
 
@@ -24,6 +23,7 @@ A locally-hosted image browser for community centres. Visitors search and view i
 
 - **Java 21** (JDK — not JRE)
 - **Maven 3.9+**
+- **PostgreSQL** (e.g. via `docker compose up postgres`, see `docker-compose.yml`)
 
 ---
 
@@ -46,6 +46,7 @@ target/image-browser-1.0.0.jar
 ### Development
 
 ```bash
+docker compose up -d postgres   # start PostgreSQL
 mvn spring-boot:run
 ```
 
@@ -59,50 +60,23 @@ Then open: [http://localhost:7000](http://localhost:7000)
 
 The `-Xmx512m` cap is recommended for low-spec PCs. Increase if you have more RAM available.
 
----
+### Docker
 
-## Deployment Layout
-
-Place these files in the same folder on the target PC:
-
-```
-C:\ImageBrowser\
-    image-browser-1.0.0.jar
-    data\input\Archive_Index_Numbers_Current.xlsx   ← source spreadsheet (see format below)
-    images.db                 ← created automatically on first run (also stores admin password hash)
-    start.bat                 ← Windows startup script
+```bash
+mvn spring-boot:build-image   # builds image-browser:latest via Cloud Native Buildpacks
+docker compose up
 ```
 
-### start.bat
-
-```bat
-@echo off
-cd /d C:\ImageBrowser
-java -Xmx512m -jar image-browser-1.0.0.jar
-```
-
-### Auto-start on Windows boot (Task Scheduler)
-
-1. Open **Task Scheduler** → Create Basic Task
-2. Trigger: **When the computer starts**
-3. Action: **Start a program** → `C:\ImageBrowser\start.bat`
-4. Start in: `C:\ImageBrowser`
-
-### Kiosk mode (optional — hides browser chrome)
-
-```bat
-"C:\Program Files\Google\Chrome\Application\chrome.exe" ^
-  --kiosk http://localhost:7000 ^
-  --no-first-run ^
-  --disable-translate
-```
+`docker-compose.yml` runs both PostgreSQL and the app, bind-mounting `./data` so the admin
+"reload" action can rewrite `data/output` and pick up spreadsheet/image updates under
+`data/input` on the host.
 
 ---
 
 ## Admin Password
 
-The admin password is stored as a one-way (BCrypt) hash in the `app_config` table of `images.db`.
-On first run, no hash exists yet, so the app seeds one for the default password
+The admin password is stored as a one-way (BCrypt) hash in the `app_config` table in
+PostgreSQL. On first run, no hash exists yet, so the app seeds one for the default password
 `changeme` — **always change this before deploying**, via **Admin Panel → Change Admin
 Password** (requires the current password).
 
@@ -110,26 +84,28 @@ Password** (requires the current password).
 
 ## Spreadsheet Format
 
-The application reads embedded images from any sheet in the workbook.
-
-### Last Updated (version control)
-
-Add a sheet named **Metadata** with a timestamp in cell **A1**:
+The application reads rows from a sheet named **AVIATION** with columns:
 
 ```
-Sheet: Metadata
-A1:    2026-05-22T10:30:00
+REF. NO. | LOCATION | DATE | DESCRIPTION/ NOTES | Folder/Page No | Image File Name | ...
 ```
 
-On startup, the app compares this value to the stored version. If it has changed, all images are cleared and reimported. If unchanged, startup is fast (images loaded from cache/database).
+`DATE` and `DESCRIPTION` are combined into a single searchable description, e.g.
+`Mr Hucks publicity photograph (1911)` (the `(date)` suffix is omitted when `DATE` is blank).
+`Folder/Page No` and `Image File Name` locate the corresponding image file under
+`data/input/AVIATION/<folder>/<fileName>`. A row is skipped (not an error) when description,
+folder, or file name is blank.
 
-**Update A1 every time you add or change images in the spreadsheet.**
+There is no version-gated import — every admin **Reload** does a full resync: the output
+directory is rebuilt from the input directory (`OutputSyncService`), and the `AVIATION` sheet
+is re-read into PostgreSQL (`AviationImportService`), dropping and recreating the `images`
+table each time.
 
 ### Supported image formats
 
 Raster formats are supported: PNG, JPEG, GIF, BMP, TIFF.
 
-Vector formats (EMF, WMF, SVG) are skipped automatically.
+Vector formats (EMF, WMF, SVG) are skipped automatically (no thumbnail generated).
 
 ---
 
@@ -152,16 +128,12 @@ All configuration is in `application.properties` (or override via environment va
 | Property | Default | Description |
 |---|---|---|
 | `server.port` | `7000` | HTTP port |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/image_browser` | PostgreSQL connection URL |
 | `app.spreadsheet.path` | `data/input/Archive_Index_Numbers_Current.xlsx` | Path to Excel file |
+| `app.data.output-dir` | `data/output` | Where synced images/thumbnails are written |
+| `app.browse.page-size` | `60` | Images per page in "browse all" (`*`) mode |
 | `app.thumbnail.max-px` | `128` | Thumbnail longest edge in pixels |
 | `app.thumbnail.jpeg-quality` | `0.75` | JPEG compression quality (0.0–1.0) |
-| `app.cache.thumbnail-max-bytes` | `15728640` | Thumbnail cache size (15MB) |
-| `app.cache.fullimage-max-bytes` | `41943040` | Full image cache size (40MB) |
-| `app.cache.expire-minutes` | `15` | Cache TTL after last access |
-| `app.preload.enabled` | `true` | Preload thumbnails on startup |
-| `app.preload.page-size` | `50` | Preload batch size |
-| `app.search.page-size` | `30` | Search results per page |
-| `app.db.path` | `images.db` | SQLite database file path |
 
 Override example:
 
@@ -182,37 +154,7 @@ Navigate to [http://localhost:7000/admin/login](http://localhost:7000/admin/logi
 - Password-protected login
 - Only one admin session allowed at a time
 - Sessions expire after 30 minutes of inactivity
-- Force reload from spreadsheet (clears DB and reimports)
-
----
-
-## Architecture
-
-For class diagrams, an ER diagram, and sequence diagrams covering startup,
-spreadsheet import, search/browse, image viewing, caching, and the admin
-flows, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-```
-Browser (HTMX)
-    │
-    ▼
-Spring Boot / Tomcat
-    │
-    ├── ImageController   — search, thumbnails, viewer, modal fragments
-    ├── AdminController   — login, logout, reload
-    │
-    ├── ImageSearchService  — search + navigation logic
-    ├── ImageCacheService   — Caffeine L1 cache (thumbnail + full image)
-    ├── SpreadsheetImportService — Apache POI → SQLite importer
-    ├── ThumbnailService    — JPEG thumbnail generation
-    │
-    ├── ImageRepository   — all SQLite queries via JdbcTemplate
-    └── SQLite (images.db)
-            ├── images         — full images + thumbnails as BLOBs
-            ├── image_meta     — tags + descriptions
-            ├── images_fts     — FTS5 full-text search index
-            └── app_config     — last_updated version tracking
-```
+- Reload (resync images from spreadsheet + reimport into PostgreSQL), with a live progress bar
 
 ---
 
@@ -230,7 +172,7 @@ mvn test
 mvn verify
 ```
 
-Integration tests use an in-memory SQLite database and are named `*IT.java`.
+Integration tests are named `*IT.java`.
 
 ---
 
@@ -246,20 +188,23 @@ src/
 │   │   │   └── AdminSessionManager.java
 │   │   ├── config/
 │   │   │   ├── DatabaseInitialiser.java
-│   │   │   └── SessionConfig.java
+│   │   │   ├── SessionConfig.java
+│   │   │   └── SpreadsheetAvailabilityCheck.java
 │   │   ├── controller/
 │   │   │   ├── AdminController.java
 │   │   │   └── ImageController.java
 │   │   ├── model/
-│   │   │   ├── AppConfig.java
-│   │   │   ├── ImageRecord.java
-│   │   │   └── ImageSummary.java
+│   │   │   ├── AviationImageRecord.java
+│   │   │   └── AviationImageSummary.java
 │   │   ├── repository/
-│   │   │   └── ImageRepository.java
+│   │   │   ├── AdminConfigRepository.java
+│   │   │   └── AviationImageRepository.java
 │   │   └── service/
-│   │       ├── ImageCacheService.java
-│   │       ├── ImageSearchService.java
-│   │       ├── SpreadsheetImportService.java
+│   │       ├── AdminReloadService.java
+│   │       ├── AviationImageService.java
+│   │       ├── AviationImportService.java
+│   │       ├── ImportProgressService.java
+│   │       ├── OutputSyncService.java
 │   │       └── ThumbnailService.java
 │   └── resources/
 │       ├── application.properties
@@ -272,21 +217,19 @@ src/
 │               ├── login.html
 │               └── panel.html
 └── test/
-    ├── java/uk/co/community/imagebrowser/
-    │   ├── controller/
-    │   │   ├── AdminControllerTest.java
-    │   │   └── ImageControllerTest.java
-    │   ├── integration/
-    │   │   └── ApplicationIntegrationIT.java
-    │   ├── repository/
-    │   │   └── ImageRepositoryTest.java
-    │   └── service/
-    │       ├── AdminSessionManagerTest.java
-    │       ├── ImageSearchServiceTest.java
-    │       ├── SpreadsheetImportServiceTest.java
-    │       └── ThumbnailServiceTest.java
-    └── resources/
-        └── application-test.properties
+    └── java/uk/co/community/imagebrowser/
+        ├── admin/
+        │   └── AdminPasswordServiceTest.java
+        ├── config/
+        │   ├── DatabaseInitialiserTest.java
+        │   └── SessionConfigTest.java
+        ├── controller/
+        │   ├── AdminControllerTest.java
+        │   └── ImageControllerTest.java
+        └── service/
+            ├── AdminSessionManagerTest.java
+            ├── AviationImportServiceTest.java
+            └── ThumbnailServiceTest.java
 ```
 
 ---
@@ -294,7 +237,6 @@ src/
 ## Notes for Developers
 
 - **Cross-reference pattern:** `ImageController` returns HTML fragments directly from Java string templates — no separate `.html` fragment files. This keeps HTMX endpoints simple.
-- **No BLOBs in search:** `ImageSummary` deliberately omits byte arrays. BLOBs are only fetched when serving `/thumbnail/{id}` or `/image/{id}/bytes`.
+- **No BLOBs anywhere:** images live as files under `data/output`; PostgreSQL only stores metadata (`category`, `folder`, `file_name`, `date`, `description`).
 - **Admin single-session:** `AdminSessionManager` uses `AtomicReference.compareAndSet` — thread-safe with no synchronised blocks.
-- **Version checking:** Update `Metadata!A1` in the spreadsheet to trigger a reimport on next startup.
-- **Cache eviction:** Caffeine evicts by weight (bytes) + LRU + TTL. `softValues()` provides a GC safety net under memory pressure.
+- **Full resync on reload:** there is no version check — every admin "Reload" rebuilds `data/output` from `data/input` and drops/recreates the PostgreSQL `images` table from the `AVIATION` sheet.

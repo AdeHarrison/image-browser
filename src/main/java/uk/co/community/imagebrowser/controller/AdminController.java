@@ -185,14 +185,10 @@ public class AdminController {
     // Helper
     // ---------------------------------------------------------------
 
-    // TEMPORARY: admin auth disabled for local testing of the output-sync
-    // import flow — no login required to reach /admin or trigger /admin/reload.
-    // Restore the real check below before any real deployment.
     private boolean isAdmin(HttpServletRequest request) {
-        return true;
-        // HttpSession session = request.getSession(false);
-        // if (session == null) return false;
-        // return Boolean.TRUE.equals(session.getAttribute(ADMIN_ATTR))
-        //         && sessionManager.isActiveSession(session.getId());
+        HttpSession session = request.getSession(false);
+        if (session == null) return false;
+        return Boolean.TRUE.equals(session.getAttribute(ADMIN_ATTR))
+                && sessionManager.isActiveSession(session.getId());
     }
 }

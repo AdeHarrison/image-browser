@@ -9,6 +9,33 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  image-browser:
+    image: image-browser:latest
+    # Built via "mvn spring-boot:build-image" (see pom.xml's spring-boot-maven-plugin
+    # config) — Cloud Native Buildpacks, no Dockerfile. Rebuild and re-run
+    # "docker compose up" to pick up code changes.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/image_browser
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    ports:
+      - "7000:7000"
+    volumes:
+      # app.spreadsheet.path / app.data.output-dir resolve to ./data/input and
+      # ./data/output under the working directory. Bind-mounted (not baked into
+      # the image) because the admin "reload" action rewrites data/output, and
+      # data/input holds the spreadsheet/images an admin updates on the host.
+      - ./data:/app/data
 
 volumes:
   postgres_data:

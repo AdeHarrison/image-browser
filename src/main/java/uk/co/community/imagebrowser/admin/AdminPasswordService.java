@@ -5,12 +5,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import uk.co.community.imagebrowser.model.AppConfig;
-import uk.co.community.imagebrowser.repository.ImageRepository;
+import uk.co.community.imagebrowser.repository.AdminConfigRepository;
 
 /**
  * Stores the admin password as a one-way BCrypt hash in the {@code app_config}
- * table (key {@value AppConfig#ADMIN_PASSWORD_HASH_KEY}).
+ * table (key {@value #ADMIN_PASSWORD_HASH_KEY}).
  *
  * On first run, when no hash is stored yet, a default password is hashed and
  * persisted so the admin panel is reachable out of the box.
@@ -23,34 +22,33 @@ public class AdminPasswordService {
     /** Minimum length enforced when setting a new admin password. */
     public static final int MIN_PASSWORD_LENGTH = 8;
 
+    public static final String ADMIN_PASSWORD_HASH_KEY = "admin_password_hash";
+
     /** BCrypt hash of the default password ("changeme"), used to seed app_config on first run. */
     private static final String DEFAULT_PASSWORD_HASH =
             "$2a$10$IIrVDAuaaw8LdH5fttpjg.XFj6XQU0Phfv/uJ5LYL5KNOJDr8VkDa";
 
-    private final ImageRepository repository;
+    private final AdminConfigRepository repository;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private String passwordHash;
 
-    public AdminPasswordService(ImageRepository repository) {
+    public AdminPasswordService(AdminConfigRepository repository) {
         this.repository = repository;
     }
 
-    // TEMPORARY: this used ImageRepository (SQLite schema — AUTOINCREMENT, FTS5)
-    // which is incompatible with the PostgreSQL datasource now configured in
-    // application.properties, and admin auth is already bypassed for testing
-    // (see AdminController.isAdmin()). Disabled to avoid a startup crash;
-    // restore alongside re-enabling the SQLite datasource / real auth.
+    // Calls repository.createSchemaIfNotExists() itself (idempotent) rather than relying on
+    // DatabaseInitialiser, since @PostConstruct order between beans isn't guaranteed.
     @PostConstruct
     public void load() {
-        // repository.createSchema();
-        //
-        // passwordHash = repository.getConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY)
-        //         .orElseGet(() -> {
-        //             log.warn("No admin password set. Seeding default password — change it before deploying.");
-        //             repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, DEFAULT_PASSWORD_HASH);
-        //             return DEFAULT_PASSWORD_HASH;
-        //         });
+        repository.createSchemaIfNotExists();
+
+        passwordHash = repository.getValue(ADMIN_PASSWORD_HASH_KEY)
+                .orElseGet(() -> {
+                    log.warn("No admin password set. Seeding default password — change it before deploying.");
+                    repository.setValue(ADMIN_PASSWORD_HASH_KEY, DEFAULT_PASSWORD_HASH);
+                    return DEFAULT_PASSWORD_HASH;
+                });
     }
 
     public boolean verify(String candidate) {
@@ -68,7 +66,7 @@ public class AdminPasswordService {
             return false;
         }
         passwordHash = encoder.encode(newPassword);
-        repository.setConfig(AppConfig.ADMIN_PASSWORD_HASH_KEY, passwordHash);
+        repository.setValue(ADMIN_PASSWORD_HASH_KEY, passwordHash);
         return true;
     }
 }
