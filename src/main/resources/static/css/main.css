@@ -26,6 +26,8 @@ header {
 
 header h1 { font-size: 1.2rem; font-weight: 600; }
 
+.total-count { color: #aaa; font-size: 0.85rem; }
+
 .admin-link {
     margin-left: auto;
     color: #aaa;

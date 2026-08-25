@@ -21,6 +21,18 @@ public class AviationImageRepository {
     private static final String SUMMARY_SELECT =
             "SELECT id, category, folder, file_name, date, description FROM images";
 
+    private static final String CREATE_TABLE_DDL = """
+        CREATE TABLE %s images (
+            id          SERIAL PRIMARY KEY,
+            category    TEXT NOT NULL,
+            date        TEXT,
+            description TEXT NOT NULL,
+            folder      TEXT NOT NULL,
+            file_name   TEXT NOT NULL,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """;
+
     private final JdbcTemplate jdbc;
 
     public AviationImageRepository(JdbcTemplate jdbc) {
@@ -28,23 +40,24 @@ public class AviationImageRepository {
     }
 
     /**
+     * Creates the images table if it doesn't exist yet. Called on every startup
+     * so the table (and a count of 0) is always there to query — including on
+     * the very first run, before an admin has ever triggered an import.
+     */
+    @Transactional
+    public void createSchemaIfNotExists() {
+        jdbc.execute(CREATE_TABLE_DDL.formatted("IF NOT EXISTS"));
+    }
+
+    /**
      * Drops the images table if present, then recreates it empty. created_at is
-     * stamped by insert()'s default.
+     * stamped by insert()'s default. Called on every import so a reimport always
+     * starts from a clean table.
      */
     @Transactional
     public void resetSchema() {
         jdbc.execute("DROP TABLE IF EXISTS images");
-        jdbc.execute("""
-            CREATE TABLE images (
-                id          SERIAL PRIMARY KEY,
-                category    TEXT NOT NULL,
-                date        TEXT,
-                description TEXT NOT NULL,
-                folder      TEXT NOT NULL,
-                file_name   TEXT NOT NULL,
-                created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-            )
-        """);
+        jdbc.execute(CREATE_TABLE_DDL.formatted(""));
     }
 
     @Transactional
