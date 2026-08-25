@@ -30,12 +30,15 @@ public class AviationImageService {
 
     private final AviationImageRepository repository;
     private final Path                    outputDir;
+    private final int                     browsePageSize;
 
     public AviationImageService(
             AviationImageRepository repository,
-            @Value("${app.data.output-dir:data/output}") String outputDir) {
-        this.repository = repository;
-        this.outputDir  = Path.of(outputDir);
+            @Value("${app.data.output-dir:data/output}") String outputDir,
+            @Value("${app.browse.page-size:60}") int browsePageSize) {
+        this.repository    = repository;
+        this.outputDir     = Path.of(outputDir);
+        this.browsePageSize = browsePageSize;
     }
 
     public List<AviationImageSummary> search(String query) {
@@ -44,6 +47,15 @@ public class AviationImageService {
 
     public long count() {
         return repository.count();
+    }
+
+    public int browsePageSize() {
+        return browsePageSize;
+    }
+
+    /** One page (0-indexed) of every image, ordered by id, for the "browse all" (*) view. */
+    public List<AviationImageSummary> browse(int page) {
+        return repository.findPage(page * browsePageSize, browsePageSize);
     }
 
     public Optional<byte[]> getThumbnail(long id) {

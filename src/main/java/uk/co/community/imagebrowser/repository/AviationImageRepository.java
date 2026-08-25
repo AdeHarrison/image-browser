@@ -74,6 +74,12 @@ public class AviationImageRepository {
         return jdbc.query(SUMMARY_SELECT + " ORDER BY id", this::mapSummary);
     }
 
+    /** One page of every image, ordered by id, for the "browse all" (*) view. */
+    public List<AviationImageSummary> findPage(int offset, int limit) {
+        return jdbc.query(SUMMARY_SELECT + " ORDER BY id LIMIT ? OFFSET ?",
+                this::mapSummary, limit, offset);
+    }
+
     public Optional<AviationImageSummary> findById(long id) {
         return jdbc.query(SUMMARY_SELECT + " WHERE id = ?", this::mapSummary, id)
                 .stream().findFirst();

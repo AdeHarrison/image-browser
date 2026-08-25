@@ -116,6 +116,31 @@ main { padding: 1.2rem 1.5rem; max-width: 1400px; margin: 0 auto; }
 /* ===== Load more trigger ===== */
 .load-more { width: 100%; text-align: center; padding: 1rem; color: #888; }
 
+/* ===== Browse-all pagination ===== */
+.browse-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 1rem 0;
+}
+.browse-nav:empty { display: none; }
+
+.browse-nav button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.browse-nav button:hover:not(:disabled) { border-color: #0066cc; }
+.browse-nav button:disabled { opacity: 0.4; cursor: default; }
+
+.browse-page { color: #555; font-size: 0.9rem; }
+
 /* ===== Modal ===== */
 #modal-backdrop {
     display: none;

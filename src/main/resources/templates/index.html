@@ -22,14 +22,13 @@
         <input id="search-input"
                type="search"
                name="q"
-               placeholder="Search images... (min 3 characters)"
+               placeholder="Search images... (min 3 characters, or * to browse all)"
                autocomplete="off"
-               minlength="3"
                hx-get="/search"
-               hx-trigger="keyup changed delay:300ms[target.value.length >= 3], search[target.value.length >= 3]"
+               hx-trigger="keyup changed delay:300ms[target.value.length >= 3 || target.value === '*'], search[target.value.length >= 3 || target.value === '*']"
                hx-target="#grid"
                hx-indicator="#search-spinner"
-               oninput="if(this.value.length < 3) document.getElementById('grid').innerHTML = '<p class=&quot;loading&quot;>Type at least 3 characters to search…</p>'"
+               oninput="if(this.value.length < 3 && this.value !== '*') { document.getElementById('grid').innerHTML = '<p class=&quot;loading&quot;>Type at least 3 characters to search…</p>'; document.getElementById('browse-nav').innerHTML = ''; }"
                autofocus>
         <span id="search-spinner" class="htmx-indicator spinner">⏳</span>
     </div>
@@ -38,13 +37,29 @@
     <div id="grid" class="image-grid">
         <p class="loading">Type at least 3 characters to search…</p>
     </div>
+
+    <!-- Browse-all (*) pagination, filled via an out-of-band swap from /search or /browse -->
+    <div id="browse-nav" class="browse-nav"></div>
 </main>
 
 <script>
-    // Guard against a stale in-flight /search response (fired while >=3 chars were
-    // present) swapping in after the user has since deleted back below 3 chars.
+    var searchInput = document.getElementById('search-input');
+
+    // "*" is a request to browse every image instead of searching by text —
+    // reroute the debounced htmx request from /search to /browse.
+    document.body.addEventListener('htmx:configRequest', function (evt) {
+        if (evt.detail.elt === searchInput && searchInput.value === '*') {
+            evt.detail.path = '/browse';
+            delete evt.detail.parameters.q;
+            evt.detail.parameters.page = 0;
+        }
+    });
+
+    // Guard against a stale in-flight /search or /browse response swapping in
+    // after the user has since deleted back below 3 chars (and isn't browsing all).
     document.body.addEventListener('htmx:beforeSwap', function (evt) {
-        if (evt.target.id === 'grid' && document.getElementById('search-input').value.length < 3) {
+        var val = searchInput.value;
+        if ((evt.target.id === 'grid' || evt.target.id === 'browse-nav') && val.length < 3 && val !== '*') {
             evt.detail.shouldSwap = false;
         }
     });

@@ -91,6 +91,39 @@ class ImageControllerTest {
     }
 
     @Test
+    @DisplayName("GET /browse returns grid HTML fragment plus first/prev/next/last nav")
+    void browse_WhenPageHasResults_ShouldReturnGridAndNav() throws Exception {
+        var results = List.of(
+                new AviationImageSummary(1L, "AVIATION", "4", "3.jpg", "Mr Hucks publicity photograph"));
+        when(imageService.browsePageSize()).thenReturn(60);
+        when(imageService.count()).thenReturn(1L);
+        when(imageService.browse(0)).thenReturn(results);
+
+        mvc.perform(get("/browse").param("page", "0"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("/thumbnail/1")))
+           .andExpect(content().string(containsString("id=\"browse-nav\"")))
+           .andExpect(content().string(containsString("First")))
+           .andExpect(content().string(containsString("Previous")))
+           .andExpect(content().string(containsString("Next")))
+           .andExpect(content().string(containsString("Last")));
+    }
+
+    @Test
+    @DisplayName("GET /browse clamps an out-of-range page to the last page")
+    void browse_WhenPageOutOfRange_ShouldClampToLastPage() throws Exception {
+        when(imageService.browsePageSize()).thenReturn(60);
+        when(imageService.count()).thenReturn(120L);
+        when(imageService.browse(1)).thenReturn(List.of(
+                new AviationImageSummary(61L, "AVIATION", "5", "1.jpg", "desc")));
+
+        mvc.perform(get("/browse").param("page", "99"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("/thumbnail/61")))
+           .andExpect(content().string(containsString("Page 2 of 2")));
+    }
+
+    @Test
     @DisplayName("GET /thumbnail/{id} returns 200 with image bytes")
     void thumbnail_WhenIdKnown_ShouldReturn200WithImageBytes() throws Exception {
         when(imageService.getThumbnail(1L)).thenReturn(Optional.of(new byte[]{1, 2, 3}));
