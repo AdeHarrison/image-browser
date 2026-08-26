@@ -23,11 +23,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    working_dir: /app
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/image_browser
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      APP_DATA_DIR: /config
     ports:
       - "7000:7000"
     volumes:
@@ -35,7 +35,7 @@ services:
       # ./data/output under the working directory. Bind-mounted (not baked into
       # the image) because the admin "reload" action rewrites data/output, and
       # data/input holds the spreadsheet/images an admin updates on the host.
-      - ./data:/app/data
+      - ${DATA_DIR:-./data}:/config/data
 
 volumes:
   postgres_data:
