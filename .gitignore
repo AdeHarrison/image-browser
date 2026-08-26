@@ -55,3 +55,7 @@ Thumbs.db
 /data/output/
 /.~lock.Changes.odp#
 /.mcp.json
+
+# docker compose credentials (POSTGRES_USER/PASSWORD/DB overrides) — real
+# secrets, never commit
+.env
