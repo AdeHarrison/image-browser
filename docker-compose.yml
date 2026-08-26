@@ -28,6 +28,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       APP_DATA_DIR: /config
+      APP_SPREADSHEET_FILENAME: ${APP_SPREADSHEET_FILENAME:-Archive_Index_Numbers_Current.xlsx}
     ports:
       - "7000:7000"
     volumes:
