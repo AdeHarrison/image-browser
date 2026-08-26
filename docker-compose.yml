@@ -9,8 +9,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-image_browser}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
+    # No host port mapping, deliberately — image-browser reaches this over the
+    # internal compose network as postgres:5432. Publishing 5432 to the host
+    # would expose the database beyond the two containers that need it. If you
+    # need host access (e.g. psql for local debugging), add a mapping in a
+    # docker-compose.override.yml that you don't deploy with.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

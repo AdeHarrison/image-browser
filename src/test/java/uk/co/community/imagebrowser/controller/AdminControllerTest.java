@@ -9,6 +9,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
+import uk.co.community.imagebrowser.admin.LoginRateLimiter;
 import uk.co.community.imagebrowser.service.AdminReloadService;
 import uk.co.community.imagebrowser.service.ImportProgressService;
 import uk.co.community.imagebrowser.service.ImportProgressService.Snapshot;
@@ -36,6 +37,7 @@ class AdminControllerTest {
     @MockitoBean private AdminPasswordService  passwordService;
     @MockitoBean private AdminReloadService    reloadService;
     @MockitoBean private ImportProgressService progressService;
+    @MockitoBean private LoginRateLimiter      loginRateLimiter;
 
     @Test
     @DisplayName("GET /admin/login returns login page")
@@ -98,6 +100,62 @@ class AdminControllerTest {
         mvc.perform(post("/admin/login").param("password", "correct"))
            .andExpect(status().isOk())
            .andExpect(content().string(containsString("could not be claimed")));
+    }
+
+    @Test
+    @DisplayName("POST /admin/login when the IP is rate-limited returns error without checking the password")
+    void login_WhenRateLimited_ShouldReturnErrorAndSkipPasswordCheck() throws Exception {
+        when(loginRateLimiter.isBlocked(any())).thenReturn(true);
+
+        mvc.perform(post("/admin/login").param("password", "whatever"))
+           .andExpect(status().isOk())
+           .andExpect(content().string(containsString("Too many failed attempts")));
+
+        verifyNoInteractions(passwordService);
+    }
+
+    @Test
+    @DisplayName("POST /admin/login with wrong password records a failed attempt")
+    void login_WhenPasswordIncorrect_ShouldRecordFailure() throws Exception {
+        when(passwordService.verify("wrong")).thenReturn(false);
+
+        mvc.perform(post("/admin/login").param("password", "wrong"));
+
+        verify(loginRateLimiter).recordFailure(any());
+    }
+
+    @Test
+    @DisplayName("POST /admin/login with correct password clears any tracked failures")
+    void login_WhenPasswordCorrectAndSlotFree_ShouldRecordSuccess() throws Exception {
+        when(passwordService.verify("correct")).thenReturn(true);
+        when(sessionManager.isAdminLoggedIn()).thenReturn(false);
+        when(sessionManager.login(any())).thenReturn(true);
+
+        mvc.perform(post("/admin/login").param("password", "correct"));
+
+        verify(loginRateLimiter).recordSuccess(any());
+    }
+
+    @Test
+    @DisplayName("GET /admin flags the panel when the admin password is still the seeded default")
+    void adminPanel_WhenUsingDefaultPassword_ShouldSetModelFlag() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.isDefaultPassword()).thenReturn(true);
+
+        mvc.perform(get("/admin").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(model().attribute("usingDefaultPassword", true));
+    }
+
+    @Test
+    @DisplayName("GET /admin does not flag the panel once the admin password has been changed")
+    void adminPanel_WhenPasswordChanged_ShouldNotSetModelFlag() throws Exception {
+        when(sessionManager.isActiveSession(any())).thenReturn(true);
+        when(passwordService.isDefaultPassword()).thenReturn(false);
+
+        mvc.perform(get("/admin").sessionAttr("admin", true))
+           .andExpect(status().isOk())
+           .andExpect(model().attribute("usingDefaultPassword", false));
     }
 
     @Test

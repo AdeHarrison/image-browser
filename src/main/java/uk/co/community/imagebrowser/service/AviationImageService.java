@@ -37,7 +37,7 @@ public class AviationImageService {
             @Value("${app.data.output-dir:data/output}") String outputDir,
             @Value("${app.browse.page-size:60}") int browsePageSize) {
         this.repository    = repository;
-        this.outputDir     = Path.of(outputDir);
+        this.outputDir     = Path.of(outputDir).normalize();
         this.browsePageSize = browsePageSize;
     }
 
@@ -77,7 +77,14 @@ public class AviationImageService {
     private Optional<byte[]> readImageFile(AviationImageSummary summary, String prefix) {
         Path path = outputDir.resolve(summary.category())
                               .resolve(summary.folder())
-                              .resolve(prefix + summary.fileName());
+                              .resolve(prefix + summary.fileName())
+                              .normalize();
+        // category/folder/fileName ultimately come from the admin-supplied spreadsheet;
+        // this stops a "../"-laden cell from resolving outside data/output.
+        if (!path.startsWith(outputDir)) {
+            log.warn("Rejected image path outside output dir: {}", path);
+            return Optional.empty();
+        }
         try {
             return Files.exists(path) ? Optional.of(Files.readAllBytes(path)) : Optional.empty();
         } catch (IOException e) {

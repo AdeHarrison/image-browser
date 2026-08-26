@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
 import uk.co.community.imagebrowser.admin.AdminSessionManager;
+import uk.co.community.imagebrowser.admin.LoginRateLimiter;
 import uk.co.community.imagebrowser.service.AdminReloadService;
 import uk.co.community.imagebrowser.service.ImportProgressService;
 
@@ -28,6 +29,7 @@ public class AdminController {
     private final AdminPasswordService   passwordService;
     private final AdminReloadService     reloadService;
     private final ImportProgressService  progressService;
+    private final LoginRateLimiter       loginRateLimiter;
 
     // Set the TEST_MODE env var (any run method: mvn spring-boot:run, java -jar, docker) to
     // bypass admin authentication entirely for automated testing. Must never be set in a
@@ -38,11 +40,13 @@ public class AdminController {
     public AdminController(AdminSessionManager    sessionManager,
                            AdminPasswordService   passwordService,
                            AdminReloadService     reloadService,
-                           ImportProgressService  progressService) {
+                           ImportProgressService  progressService,
+                           LoginRateLimiter       loginRateLimiter) {
         this.sessionManager    = sessionManager;
         this.passwordService   = passwordService;
         this.reloadService     = reloadService;
         this.progressService   = progressService;
+        this.loginRateLimiter  = loginRateLimiter;
     }
 
     @PostConstruct
@@ -71,7 +75,13 @@ public class AdminController {
     public String login(@RequestParam String password,
                         HttpServletRequest request) {
 
+        String ip = request.getRemoteAddr();
+        if (loginRateLimiter.isBlocked(ip)) {
+            return "<p class='error'>Too many failed attempts. Try again later.</p>";
+        }
+
         if (!passwordService.verify(password)) {
+            loginRateLimiter.recordFailure(ip);
             return "<p class='error'>Incorrect password.</p>";
         }
 
@@ -79,9 +89,14 @@ public class AdminController {
             return "<p class='error'>Admin is already logged in from another session.</p>";
         }
 
+        // getSession(true) guarantees a session exists, then changeSessionId() rotates its id
+        // so a pre-login session id (which may already be known to an attacker, e.g. fixed via
+        // a crafted link) can't be reused as the authenticated one.
         HttpSession session = request.getSession(true);
+        request.changeSessionId();
         if (sessionManager.login(session.getId())) {
             session.setAttribute(ADMIN_ATTR, true);
+            loginRateLimiter.recordSuccess(ip);
             // HTMX redirect header
             request.getServletContext()
                    .log("Admin logged in: session=" + session.getId());
@@ -99,6 +114,7 @@ public class AdminController {
     public String adminPanel(HttpServletRequest request, Model model) {
         if (!isAdmin(request)) return "redirect:/admin/login";
         model.addAttribute("alreadyLoggedIn", false);
+        model.addAttribute("usingDefaultPassword", passwordService.isDefaultPassword());
         return "admin/panel";
     }
 

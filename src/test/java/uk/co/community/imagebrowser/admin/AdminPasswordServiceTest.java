@@ -102,4 +102,23 @@ class AdminPasswordServiceTest {
         assertThat(service.setPassword(null)).isFalse();
         assertThat(service.verify("changeme")).isTrue();
     }
+
+    @Test
+    @DisplayName("isDefaultPassword returns true after seeding the default hash")
+    void isDefaultPassword_WhenSeeded_ShouldReturnTrue() {
+        when(repository.getValue(AdminPasswordService.ADMIN_PASSWORD_HASH_KEY)).thenReturn(Optional.empty());
+        service.load();
+
+        assertThat(service.isDefaultPassword()).isTrue();
+    }
+
+    @Test
+    @DisplayName("isDefaultPassword returns false once a stored hash was loaded instead of seeded")
+    void isDefaultPassword_WhenExistingHashLoaded_ShouldReturnFalse() {
+        String existingHash = new BCryptPasswordEncoder().encode("s3cret");
+        when(repository.getValue(AdminPasswordService.ADMIN_PASSWORD_HASH_KEY)).thenReturn(Optional.of(existingHash));
+        service.load();
+
+        assertThat(service.isDefaultPassword()).isFalse();
+    }
 }

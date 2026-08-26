@@ -55,6 +55,11 @@ public class AdminPasswordService {
         return candidate != null && encoder.matches(candidate, passwordHash);
     }
 
+    /** True if the admin password is still the seeded default ("changeme") — never changed. */
+    public boolean isDefaultPassword() {
+        return DEFAULT_PASSWORD_HASH.equals(passwordHash);
+    }
+
     /**
      * Hash and persist a new admin password.
      *
