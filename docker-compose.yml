@@ -2,15 +2,19 @@ services:
   postgres:
     image: postgres:16
     environment:
+      # No defaults, deliberately — POSTGRES_USER/PASSWORD must be supplied via .env (or the
+      # shell environment) on first run, when Postgres initialises this admin/superuser role.
+      # They're only ever used for that bootstrap and by scripts/create-app-role, never by
+      # the app itself — see the image-browser service below.
       POSTGRES_DB: ${POSTGRES_DB:-image_browser}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,8 +29,11 @@ services:
         condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-image_browser}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Deliberately NOT the POSTGRES_USER/PASSWORD admin role above, and deliberately no
+      # defaults — the app connects as a separate role, confined to its own schema (created
+      # by scripts/create-app-role.ps1 / .sh), supplied only via .env / the shell environment.
+      SPRING_DATASOURCE_USERNAME: ${APP_IB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${APP_IB_PASSWORD}
       APP_DATA_DIR: /config
       APP_SPREADSHEET_FILENAME: ${APP_SPREADSHEET_FILENAME:-Archive_Index_Numbers_Current.xlsx}
       # Bypasses admin authentication when set — for automated testing only, never in production.

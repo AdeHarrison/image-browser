@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import uk.co.community.imagebrowser.admin.AdminPasswordService;
@@ -21,6 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AdminController.class)
 @DisplayName("AdminController")
+// Pins test.mode=false regardless of any TEST_MODE env var on the machine running the
+// suite — AdminController.isAdmin() bypasses auth entirely when it's true, which would
+// otherwise make every "not authorised" assertion below fail silently depending on the
+// developer's shell environment.
+@TestPropertySource(properties = "test.mode=false")
 class AdminControllerTest {
 
     @Autowired

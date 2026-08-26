@@ -43,12 +43,46 @@ target/image-browser-1.0.0.jar
 
 ## Running
 
-### Development
+### Postgres credentials (required — no defaults)
+
+Neither `POSTGRES_USER`/`POSTGRES_PASSWORD` (the Postgres admin/superuser role) nor
+`SPRING_DATASOURCE_USERNAME`/`SPRING_DATASOURCE_PASSWORD` (the role the app itself connects
+as) have defaults anywhere — not in `docker-compose.yml`, not in `application.properties`.
+Every one of them must be supplied explicitly via env vars, or the postgres container /
+the app will fail to start. This is deliberate: the app never runs as the Postgres admin role.
+
+**One-time setup on a fresh (empty) `postgres_data` volume:**
 
 ```bash
-docker compose up -d postgres   # start PostgreSQL
+# 1. Create a .env file at the repo root (gitignored) with the admin credentials:
+#      POSTGRES_USER=<admin-username>
+#      POSTGRES_PASSWORD=<admin-password>
+
+# 2. Start Postgres only, so it bootstraps with those admin credentials
+docker compose up -d postgres
+
+# 3. Create the app's own role, confined to its own schema (never the admin role) — run once.
+#    Windows:
+./scripts/create-app-role.ps1 -AdminUser <admin-username> -AdminPassword <admin-password> -AppUser image_browser_app -AppPassword <app-password>
+#    Linux/macOS:
+./scripts/create-app-role.sh -u <admin-username> -p <admin-password> -a image_browser_app -w <app-password>
+```
+
+The script creates `image_browser_app` (or whatever `-AppUser`/`-a` you choose) with no
+superuser/createdb/createrole privileges, owning a dedicated schema (`image_schema` by
+default) that it's confined to — it cannot see the `public` schema, any other database, or
+any other role. See the script's header comment for full detail on what each step does.
+
+**Local dev** (app runs outside Docker, Postgres inside it):
+
+```bash
+docker compose up -d postgres   # if not already running
+export SPRING_DATASOURCE_USERNAME=image_browser_app   # or the app role you chose
+export SPRING_DATASOURCE_PASSWORD=<app-password>
 mvn spring-boot:run
 ```
+
+(On Windows PowerShell: `$env:SPRING_DATASOURCE_USERNAME = "image_browser_app"`, etc.)
 
 ### Production (fat JAR)
 
@@ -64,12 +98,18 @@ The `-Xmx512m` cap is recommended for low-spec PCs. Increase if you have more RA
 
 ```bash
 mvn spring-boot:build-image   # builds image-browser:latest via Cloud Native Buildpacks
+
+# Add to your .env alongside POSTGRES_USER/POSTGRES_PASSWORD:
+#   APP_IB_USER=image_browser_app
+#   APP_IB_PASSWORD=<app-password>
+
 docker compose up
 ```
 
 `docker-compose.yml` runs both PostgreSQL and the app, bind-mounting `./data` so the admin
 "reload" action can rewrite `data/output` and pick up spreadsheet/image updates under
-`data/input` on the host.
+`data/input` on the host. The app container connects using `APP_IB_USER`/`APP_IB_PASSWORD`
+(the scoped role from `scripts/create-app-role`), never `POSTGRES_USER`/`POSTGRES_PASSWORD`.
 
 ---
 
