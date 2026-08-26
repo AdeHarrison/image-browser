@@ -1,9 +1,11 @@
 package uk.co.community.imagebrowser.controller;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,12 @@ public class AdminController {
     private final AdminReloadService     reloadService;
     private final ImportProgressService  progressService;
 
+    // Set the TEST_MODE env var (any run method: mvn spring-boot:run, java -jar, docker) to
+    // bypass admin authentication entirely for automated testing. Must never be set in a
+    // deployed/production environment — it disables the admin panel's only access control.
+    @Value("${test.mode:false}")
+    private boolean testMode;
+
     public AdminController(AdminSessionManager    sessionManager,
                            AdminPasswordService   passwordService,
                            AdminReloadService     reloadService,
@@ -35,6 +43,14 @@ public class AdminController {
         this.passwordService   = passwordService;
         this.reloadService     = reloadService;
         this.progressService   = progressService;
+    }
+
+    @PostConstruct
+    void warnIfTestMode() {
+        if (testMode) {
+            log.warn("TEST_MODE is enabled — admin authentication is BYPASSED. " +
+                    "This must never be set in a deployed/production environment.");
+        }
     }
 
     // ---------------------------------------------------------------
@@ -186,6 +202,7 @@ public class AdminController {
     // ---------------------------------------------------------------
 
     private boolean isAdmin(HttpServletRequest request) {
+        if (testMode) return true;
         HttpSession session = request.getSession(false);
         if (session == null) return false;
         return Boolean.TRUE.equals(session.getAttribute(ADMIN_ATTR))

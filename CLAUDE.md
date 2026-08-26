@@ -83,6 +83,11 @@ the one allowed admin session id; `login`/`logout` are lock-free `compareAndSet`
 against `confirmPassword`, and enforces `AdminPasswordService.MIN_PASSWORD_LENGTH` via
 `setPassword()`.
 
+**`TEST_MODE` env var bypasses admin auth entirely** (`AdminController.isAdmin()` short-circuits
+to `true`, bound via `@Value("${test.mode:false}")` from the env var by Spring's relaxed
+binding). For automated testing only — must never be set in a deployed/production environment.
+Logged as a startup warning when enabled.
+
 ## Conventions
 
 - Package root: `uk.co.community.imagebrowser` (`controller` / `service` / `repository` / `model` /

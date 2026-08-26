@@ -29,6 +29,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       APP_DATA_DIR: /config
       APP_SPREADSHEET_FILENAME: ${APP_SPREADSHEET_FILENAME:-Archive_Index_Numbers_Current.xlsx}
+      # Bypasses admin authentication when set — for automated testing only, never in production.
+      TEST_MODE: ${TEST_MODE:-false}
     ports:
       - "7000:7000"
     volumes:
