@@ -62,5 +62,5 @@ Thumbs.db
 
 # local-only compose overrides (e.g. publishing ports for local tooling)
 docker-compose.override.yml
-/install/
+/install-*/
 /image-browser-images.tar

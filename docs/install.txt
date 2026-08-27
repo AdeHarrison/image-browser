@@ -1,0 +1,169 @@
+IMAGE BROWSER — OFFLINE INSTALL (Windows 11, Docker, no internet on target PC)
+================================================================================
+
+PREREQUISITES ON THE TARGET PC
+-------------------------------
+Nothing needs to be pre-installed. This guide installs everything from a USB
+stick: Docker Desktop + its WSL2 backend. No Java, no Maven, no native
+PostgreSQL — the app's JRE is baked into the Docker image, and Postgres runs
+as its own container.
+
+Docker Desktop is free for personal use, education, and small businesses under
+its published headcount/revenue threshold — worth a quick check that this
+deployment qualifies, since licensing terms can change.
+
+
+BUILDING THE USB PACKAGE (on your dev PC, run from the repo root)
+-------------------------------------------------------------------
+1. Build the app image:
+     mvn spring-boot:build-image
+
+2. Save both images to a tarball:
+     docker save postgres:16 image-browser:latest -o image-browser-images.tar
+
+3. Make sure these are in your Downloads folder (download ahead of time,
+   since the target PC has no internet):
+     - Docker Desktop Installer.exe
+     - wsl_update_x64.msi
+       https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
+       (documented at https://learn.microsoft.com/en-us/windows/wsl/install-manual —
+       double-check the link still resolves before relying on it on-site)
+
+4. Fill in .env at the repo root with FRESH production credentials (do not
+   reuse dev/test credentials):
+     POSTGRES_USER=<admin-user>
+     POSTGRES_PASSWORD=<strong admin password>
+     APP_IB_USER=image_browser_app
+     APP_IB_PASSWORD=<strong app password>
+   Leave TEST_MODE unset (or false) — it must never be set on a real deployment,
+   it disables all admin authentication.
+   Do NOT include docker-compose.override.yml — it's dev/test-only and would
+   expose Postgres on the LAN via host port 5433 with no firewall rule
+   protecting it.
+
+5. Run the packaging script:
+     .\scripts\create-install-package.ps1
+   This creates install-<YYYY-MM-DD-HH-MM-SS>\ at the repo root containing:
+     - docker-compose.yml
+     - .env
+     - image-browser-images.tar
+     - scripts\create-app-role.ps1 and .sh
+     - data\input\ (spreadsheet + source images — data\output is regenerated
+       on the target by the app's own Reload, so it isn't copied)
+     - Docker Desktop Installer.exe, wsl_update_x64.msi (from Downloads)
+   Copy that whole folder to the USB stick.
+
+
+INSTALLING ON THE TARGET PC
+------------------------------
+
+1. Copy the project files off the USB stick
+   ---------------------------------------
+   New-Item -ItemType Directory -Force C:\image-browser
+   Copy-Item D:\docker-compose.yml, D:\.env C:\image-browser\
+   Copy-Item D:\scripts C:\image-browser\ -Recurse
+   Copy-Item D:\data C:\image-browser\ -Recurse
+   Copy-Item D:\image-browser-images.tar C:\image-browser\
+
+   (Adjust D:\ to whatever drive letter the stick gets.)
+
+2. Enable WSL2's Windows features
+   -------------------------------
+   dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+   dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+   Restart-Computer
+
+3. Install the WSL2 kernel update (offline)
+   -----------------------------------------
+   msiexec /i D:\wsl_update_x64.msi /qn
+   wsl --set-default-version 2
+
+4. Install Docker Desktop
+   -----------------------
+   Run D:\Docker Desktop Installer.exe, accept defaults (WSL2 backend). Reboot
+   when prompted. On first launch, accept the service agreement, skip signing
+   in (not needed to run local images), let it finish WSL2 integration setup.
+
+   In Docker Desktop -> Settings -> General, tick "Start Docker Desktop when
+   you log in" — this PC runs unattended and needs to survive reboots/power
+   cuts.
+
+   Settings -> Resources -> WSL integration does NOT need anything enabled —
+   that tab only matters if you plan to run docker commands from inside a
+   WSL Linux distro's bash shell. This install runs everything from
+   PowerShell directly, which talks to the Docker engine independently of
+   those toggles.
+
+5. Verify Docker works
+   --------------------
+   docker version
+   docker compose version
+   Both should return version info with no errors.
+
+6. Load the pre-built images (no internet needed)
+   ------------------------------------------------
+   cd C:\image-browser
+   docker load -i image-browser-images.tar
+   docker images   (confirm postgres:16 and image-browser:latest are listed)
+
+7. Check .env
+   -----------
+   Open C:\image-browser\.env and confirm POSTGRES_USER/PASSWORD and
+   APP_IB_USER/PASSWORD are the fresh production values, and TEST_MODE is
+   absent or false.
+
+8. Start Postgres only, then create the scoped app role
+   -------------------------------------------------------
+   docker compose up -d postgres
+   docker compose ps   (wait until it shows "healthy")
+
+   .\scripts\create-app-role.ps1 -AdminUser <admin-user> -AdminPassword <admin-password> -AppUser image_browser_app -AppPassword <app-password>
+
+   Use the SAME APP_IB_USER/APP_IB_PASSWORD values here as in .env — the
+   script creates the role, .env is what tells the app container which role
+   to connect as.
+
+9. Bring up the full stack
+   ------------------------
+   docker compose up -d
+   docker compose ps                                (both services "Up"/"healthy")
+   docker compose logs image-browser --tail=50       (sanity-check no startup errors)
+
+10. Verify in a browser
+    --------------------
+    Open http://localhost:7000 — the image browser UI should appear.
+    Then http://localhost:7000/admin/login, log in with the default password
+    "changeme", and IMMEDIATELY change it via Admin Panel -> Change Admin
+    Password.
+
+11. Do the first Reload
+    --------------------
+    In the admin panel, run Reload so it reads
+    data\input\...\Archive_Index_Numbers_Current.xlsx, imports the spreadsheet
+    into Postgres, and confirm images/thumbnails appear.
+
+12. LAN deployment
+    ---------------
+    a. Give the PC a static IP (network adapter settings, or a DHCP
+       reservation on the router).
+    b. Allow port 7000 inbound through Windows Firewall:
+         New-NetFirewallRule -DisplayName "Image Browser" -Direction Inbound -LocalPort 7000 -Protocol TCP -Action Allow
+    c. Other PCs on-site reach it at http://<that-static-ip>:7000
+
+13. Survives reboots automatically
+    -------------------------------
+    docker-compose.yml has restart: unless-stopped on both services, so after
+    a power cut (with Docker Desktop set to start at login, per step 4) the
+    containers come back up on their own — no one needs to run
+    "docker compose up -d" by hand after a reboot.
+
+
+DAY-TO-DAY REFERENCE FOR WHOEVER MAINTAINS THIS ON-SITE
+==========================================================
+- Restart everything:        docker compose restart          (from C:\image-browser)
+- View logs:                 docker compose logs -f image-browser
+- Stop everything:           docker compose down             (data persists in the
+                              postgres_data named volume — this does NOT delete it)
+- Update the spreadsheet/images: drop new files into
+                              C:\image-browser\data\input\..., then use
+                              Admin Panel -> Reload — no container restart needed.
